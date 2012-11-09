@@ -8,3 +8,8 @@ kovan-kmod
 *.mod.c
 modules.order
 Module.symvers
+
+#Eclipse
+.autotools
+.cproject
+.project
