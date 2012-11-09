@@ -1,0 +1,10 @@
+*.ko
+*~
+*.o
+*.cmd
+kovan-kmod
+.tmp_versions/
+*.swp
+*.mod.c
+modules.order
+Module.symvers
