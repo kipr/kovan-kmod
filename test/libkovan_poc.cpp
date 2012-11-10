@@ -34,7 +34,7 @@ private:
 KovanModule::KovanModule(const uint64_t& moduleAddress, const uint16_t& modulePort)
 	: m_sock(-1)
 {
-	memset(&m_out, 0, sizeof(sendsocket));
+	memset(&m_out, 0, sizeof(m)out));
 	m_out.sin_family = AF_INET;
 	m_out.sin_addr.s_addr = moduleAddress;
 	m_out.sin_port = modulePort;
@@ -69,7 +69,7 @@ bool KovanModule::bind(const uint64_t& address, const uint16_t& port)
 	sa.sin_addr.s_addr = address;
 	sa.sin_port = port;
 
-	if(bind(m_sock, (sockaddr *)&sa, sizeof(sa)) < 0) {
+	if(::bind(m_sock, (sockaddr *)&sa, sizeof(sa)) < 0) {
 		perror("bind");
 		return false;
 	}
@@ -81,7 +81,7 @@ void KovanModule::close()
 {
 	if(m_sock < 0) return;
 	
-	close(m_sock);
+	::close(m_sock);
 }
 
 const uint64_t& KovanModule::moduleAddress() const
@@ -105,7 +105,7 @@ bool KovanModule::send(const CommandVector& commands)
 	Packet *packet = createPacket(commands.size(), packetSize);
 	
 	bool ret = true;
-	if(sendto(sock, packet, packetSize, 0, (sockaddr *)&m_out, sizeof(m_out)) != packetSize) {
+	if(sendto(m_sock, packet, packetSize, 0, (sockaddr *)&m_out, sizeof(m_out)) != packetSize) {
 		perror("sendto");
 		ret = false;
 	}
@@ -117,7 +117,7 @@ bool KovanModule::send(const CommandVector& commands)
 Packet *KovanModule::createPacket(const uint16_t& num, uint32_t& packet_size)
 {
 	packet_size = sizeof(Packet) + sizeof(Command) * (num - 1);
-	Packet *packet = malloc(packet_size);
+	Packet *packet = reinterpret_cast<Packet *>(malloc(packet_size));
 	packet->num = num;
 	return packet;
 }
