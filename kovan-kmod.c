@@ -84,11 +84,13 @@ struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 	struct StateResponse response;
 	memset(&response, 0, sizeof(struct StateResponse));
 	
-	if(size != sizeof(struct Packet)) {
+	if(size < sizeof(struct Packet)) {
 		return response; // Error: Packet is too small?
 	}
 	
 	struct Packet *packet = (struct Packet *)data;
+	
+	printk("Received %u commands\n", packet->num);
 	
 	for(unsigned short i = 0; i < packet->num; ++i) {
 		struct Command cmd = packet->commands[i];
