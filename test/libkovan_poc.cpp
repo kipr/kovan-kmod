@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <vector>
+#include <unistd.h>
 #include "../protocol.h"
 
 typedef std::vector<Command> CommandVector;
