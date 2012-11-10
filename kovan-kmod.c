@@ -85,7 +85,6 @@ struct wq_wrapper wq_data;
 //static int u8_writer(struct driver_data *drv_data)
 int kovan_write_u8(unsigned char data)
 {
-
 	unsigned int sssr = __raw_readl(SSP3_SSSR);
 
 	if ((sssr & 0x00000f00) == 0x00000f00){
@@ -94,9 +93,6 @@ int kovan_write_u8(unsigned char data)
 	}
 
 	__raw_writeb(data, SSP3_SSDR);
-
-	//printk("Succeeded in writing %d\n", data);
-
 	return 1;
 }
 
@@ -104,17 +100,14 @@ int kovan_write_u8(unsigned char data)
 //static int u8_writer(struct driver_data *drv_data)
 int kovan_write_u16(unsigned int data)
 {
-
 	unsigned int sssr = __raw_readl(SSP3_SSSR);
 
 	if ((sssr & 0x00000f00) == 0x00000f00){
 		printk("Can't write %d\n",data);
 		return 0;
 	}
+
 	__raw_writel(data, SSP3_SSDR);
-
-	//printk("Succeeded in writing %d\n", data);
-
 	return 1;
 }
 
@@ -130,6 +123,12 @@ static int rx_empty(){
 	}
 }
 
+static inline int spi_busy(){
+
+	if (__raw_readl(SSP3_SSSR) & SSSR_BSY){}; return 1;
+
+	return 0;
+}
 
 
 //static int u8_writer(struct driver_data *drv_data)
@@ -225,6 +224,7 @@ void spi_test(){
 
 	for (i = 0; i < num_vals_to_send; i++){
 		kovan_write_u16(buff_tx[i]);
+		while (spi_busy()){};
 		buff_rx[i] = __raw_readl(SSP3_SSDR);
 	}
 	for (i = 0; i < num_vals_to_send; i++){
@@ -235,6 +235,8 @@ void spi_test(){
 	print_spi_regs();
 
 }
+
+
 
 void cb_data(struct sock *sk, int bytes)
 {
@@ -301,6 +303,7 @@ static int __init server_init( void )
 	printk("INIT MODULE\n");
 
 	init_spi();
+	spi_test();
 
 	/* socket to receive data */
 	if (sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &udpsocket) < 0) {
@@ -343,7 +346,7 @@ static void __exit server_exit( void )
                 flush_workqueue(wq);
                 destroy_workqueue(wq);
 	}
-	printk("EXIT MODULE");
+	printk("EXIT MODULE\n");
 }
 
 module_init(server_init);
