@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <vector>
+#include <iostream>
 #include <unistd.h>
 #include "../protocol.h"
 
@@ -28,6 +29,8 @@ public:
 	
 	bool send(const Command& command);
 	bool send(const CommandVector& commands);
+	
+	bool recv(State& state);
 	
 private:
 	int m_sock;
@@ -120,6 +123,17 @@ bool KovanModule::send(const CommandVector& commands)
 	return ret;
 }
 
+bool KovanModule::recv(State& state)
+{
+	memset(&state, 0, sizeof(State));
+	if(recvfrom(m_sock, &state, sizeof(State), 0, NULL, NULL) != sizeof(State)){
+		perror("recvfrom");
+		return false;
+	}
+	return true;
+}
+
+
 Packet *KovanModule::createPacket(const uint16_t& num, uint32_t& packet_size)
 {
 	packet_size = sizeof(Packet) + sizeof(Command) * (num - 1);
@@ -147,7 +161,21 @@ int main(int argc, char *argv[])
 	command.type = MotorCommandType;
 	memcpy(command.data, &test, sizeof(MotorCommand));
 	
-	kovan.send(command);
+	Command command1;
+	command1.type = StateCommandType;
+	
+	CommandVector commands;
+	commands.push_back(command);
+	commands.push_back(command1);
+	
+	kovan.send(commands);
+	
+	State state;
+	if(!kovan.recv(state)) {
+		return 1;
+	}
+	
+	std::cout << "state.t0 = " << state.t0 << "; t1 = " << state.t1 << "; t2 = " << state.t2 << std::endl;
 	
 	return 0;
 }

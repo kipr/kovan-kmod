@@ -11,6 +11,7 @@ extern "C" {
 enum CommandType
 {
 	NilType = 0,
+	StateCommandType,
 	MotorCommandType,
 	DigitalCommandType
 };
@@ -37,6 +38,13 @@ struct DigitalCommand
 {
 	unsigned char port; // 0 - 7
 	unsigned char on : 1;
+};
+
+struct State
+{
+	unsigned int t0;
+	unsigned int t1;
+	unsigned int t2;
 };
 
 #ifdef __cplusplus

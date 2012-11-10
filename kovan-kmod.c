@@ -14,6 +14,7 @@
 #include <linux/skbuff.h>
 #include <linux/delay.h>
 #include <linux/inet.h>
+#include <linux/ip.h>
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -34,6 +35,12 @@ struct wq_wrapper
 	struct sock *sk;
 };
 
+struct StateResponse
+{
+	unsigned char hasState : 1;
+	struct State state;
+};
+
 struct wq_wrapper wq_data;
 
 // static DECLARE_COMPLETION( threadcomplete );
@@ -47,24 +54,36 @@ void cb_data(struct sock *sk, int bytes)
 	queue_work(wq, &wq_data.worker);
 }
 
-unsigned char *motor_command(struct MotorCommand *cmd)
+struct StateResponse state()
+{
+	struct State ret;
+	ret.t0 = 1;
+	ret.t1 = 2;
+	ret.t2 = 3;
+	
+	struct StateResponse response;
+	response.hasState = 1;
+	response.state = ret;
+	return response;
+}
+
+void motor_command(struct MotorCommand *cmd)
 {
 	spi_test();
-	
-	return 0;
 }
 
-unsigned char *digital_command(struct DigitalCommand *cmd)
+void digital_command(struct DigitalCommand *cmd)
 {
 	// Digital Command
-	
-	return 0;
 }
 
-unsigned char *do_packet(unsigned char *data, const unsigned int size)
+struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 {
+	struct StateResponse response;
+	memset(&response, 0, sizeof(struct StateResponse));
+	
 	if(size != sizeof(struct Packet)) {
-		return 0; // Error: Packet is too small?
+		return response; // Error: Packet is too small?
 	}
 	
 	struct Packet *packet = (struct Packet *)data;
@@ -73,6 +92,10 @@ unsigned char *do_packet(unsigned char *data, const unsigned int size)
 		struct Command cmd = packet->commands[i];
 		
 		switch(cmd.type) {
+		case StateCommandType:
+			response = state();
+			break;
+		
 		case MotorCommandType:
 			motor_command((struct MotorCommand *)cmd.data);
 			break;
@@ -85,7 +108,7 @@ unsigned char *do_packet(unsigned char *data, const unsigned int size)
 		}
 	}
 	
-	return 0;
+	return response;
 }
 
 #define UDP_HEADER_SIZE 8
@@ -97,17 +120,17 @@ void do_work(struct work_struct *data)
 	int len = 0;
 	while((len = skb_queue_len(&foo->sk->sk_receive_queue)) > 0) {
 		struct sk_buff *skb = skb_dequeue(&foo->sk->sk_receive_queue);
-		printk("Message len: %i Message: %s\n", skb->len - UDP_HEADER_SIZE, skb->data + UDP_HEADER_SIZE);
-		unsigned char *response = do_packet(skb->data + UDP_HEADER_SIZE, skb->len - UDP_HEADER_SIZE);
+		printk("Message Length: %i Message: %s\n", skb->len - UDP_HEADER_SIZE, skb->data + UDP_HEADER_SIZE);
+		struct StateResponse response = do_packet(skb->data + UDP_HEADER_SIZE, skb->len - UDP_HEADER_SIZE);
 		
-		if(!response) continue;
+		if(!response.hasState) continue;
 		
 		struct sockaddr_in to;
 		memset(&to, 0, sizeof(to));
 		to.sin_family = AF_INET;
-		to.sin_addr.s_addr = in_aton("127.0.0.1");
-		unsigned short *port = (unsigned short *)skb->data;
-		to.sin_port = *port;
+		struct iphdr *ipinf = (struct iphdr *)skb_network_header(skb);
+		to.sin_addr.s_addr = ipinf->saddr;
+		to.sin_port = *((unsigned short *)skb->data);
 		
 		struct msghdr msg;
 		memset(&msg, 0, sizeof(msg));
@@ -115,9 +138,8 @@ void do_work(struct work_struct *data)
 		msg.msg_namelen = sizeof(to);
 		
 		struct iovec iov;
-		/* send the message back */
-		iov.iov_base = skb->data + UDP_HEADER_SIZE;
-		iov.iov_len  = skb->len - UDP_HEADER_SIZE;
+		iov.iov_base = &response.state;
+		iov.iov_len  = sizeof(struct State);
 		msg.msg_control = NULL;
 		msg.msg_controllen = 0;
 		msg.msg_iov = &iov;
@@ -127,11 +149,11 @@ void do_work(struct work_struct *data)
  		mm_segment_t oldfs = get_fs();
 		set_fs(KERNEL_DS);
 		
-		sock_sendmsg(clientsocket, &msg, skb->len - UDP_HEADER_SIZE);
+		sock_sendmsg(clientsocket, &msg, iov.iov_len);
 		
 		set_fs(oldfs);
 		kfree_skb(skb);
-		printk("Message Sent\n");
+		printk("Sent State Response\n");
 	}
 }
 
