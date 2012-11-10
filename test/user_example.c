@@ -7,6 +7,14 @@
 
 #define BUFFSIZE 5096 
 
+struct Packet *create_packet(const unsigned short num, unsigned int *packet_size)
+{
+	*packet_size = sizeof(struct Packet) + (sizeof(struct Command) * (num - 1));
+	struct Packet *packet = malloc(*packet_size);
+	packet->num = num;
+	return packet;
+}
+
 int main(int argc, char *argv[]) {
 	
 	int sock = 0;
@@ -35,24 +43,22 @@ int main(int argc, char *argv[]) {
 	sendsocket.sin_port = htons(5555);
 
 	/* Send message to the server */
-	char buffer[BUFFSIZE];
-	memcpy(buffer, "Hello World", strlen("Hello World") + 1);
-	int sendlen = strlen(buffer) + 1;
+	struct MotorCommand test;
 	
-	if(sendto(sock, buffer, sendlen, 0, (struct sockaddr *) &sendsocket, sizeof(sendsocket)) != sendlen) {
+	struct Command command;
+	command.cmd = MotorCommandType;
+	memcpy(command.data, &test, sizeof(struct MotorCommand));
+	
+	unsigned int packet_size = 0;
+	struct Packet *packet = create_packet(1, &packet_size);
+	memcpy(packet.commands, command, sizeof(struct Command));
+	
+	if(sendto(sock, packet, packet_size, 0, (struct sockaddr *)&sendsocket, sizeof(sendsocket)) != sendlen) {
 		perror("sendto");
 		return -1;
 	}
-
-	memset(buffer, 0, BUFFSIZE);
-	int received = 0;
-	if((received = recvfrom(sock, buffer, BUFFSIZE, 0, NULL, NULL)) < 0){
-		perror("recvfrom");
-		return -1;
-	}
-	buffer[BUFFSIZE - 1] = 0;
 	
-	printf("Message Received: %s\n", buffer);
+	free(packet);
 	
 	return 0;
 }

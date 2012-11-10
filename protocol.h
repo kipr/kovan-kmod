@@ -24,7 +24,7 @@ struct Command
 struct Packet
 {
 	unsigned short num;
-	struct Command *commands;
+	struct Command commands[1];
 };
 
 struct MotorCommand
