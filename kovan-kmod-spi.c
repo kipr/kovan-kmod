@@ -40,6 +40,7 @@
 #include <mach/regs-ssp.h>
 
 
+#define PXA_LOOPBACK_TEST 1
 
 #ifndef SSCR0_MOD
 #define SSCR0_MOD	(1 << 31)
@@ -156,7 +157,8 @@ void init_spi(void)
 	int sspsp = 0 | SSPSP_SFRMWDTH(0x16);
 
 	// SFRMDIR    1, slave mode, SSPx port received SSPx_FRM
-	int sscr1 = 0 | SSCR1_LBM;// | SSCR1_SFRMDIR;
+	int sscr1 = 0;
+	if (PXA_LOOPBACK_TEST) sscr1 |= SSCR1_LBM;// | SSCR1_SFRMDIR;
 
 	//int sscr0 = 0 | SSCR0_EDSS | SSCR0_PSP | SSCR0_DataSize(8); // 8 bits
 	int sscr0 = 0 | SSCR0_MOD | SSCR0_Motorola | SSCR0_DataSize(16);
@@ -202,7 +204,6 @@ void spi_test(void){
 
 	for (i = 0; i < num_vals_to_send; i++){
 		kovan_write_u16(buff_tx[i]);
-		while (spi_busy()){};
 		buff_rx[i] = __raw_readl(SSP3_SSDR);
 	}
 	for (i = 0; i < num_vals_to_send; i++){

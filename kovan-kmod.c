@@ -49,8 +49,8 @@ void cb_data(struct sock *sk, int bytes)
 
 	spi_test();
 
-	//wq_data.sk = sk;
-	//queue_work(wq, &wq_data.worker);
+	wq_data.sk = sk;
+	queue_work(wq, &wq_data.worker);
 }
 
 void send_answer(struct work_struct *data)

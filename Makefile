@@ -1,5 +1,5 @@
-obj-m := kovan-kmod.o
-kovan-kmod-objs :=kovan-kmod-spi.o
+obj-m := kovan.o
+kovan-objs := kovan-kmod.o kovan-kmod-spi.o
 KLOC = ../linux
 all:
 	make -C $(KLOC) M=$(PWD) modules
