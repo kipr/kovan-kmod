@@ -19,35 +19,6 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 
-#include <linux/kernel.h>	/* printk() */
-#include <linux/slab.h>		/* kmalloc() */
-#include <linux/fs.h>		/* everything... */
-#include <linux/errno.h>	/* error codes */
-#include <linux/types.h>	/* size_t */
-#include <linux/proc_fs.h>
-#include <linux/fcntl.h>	/* O_ACCMODE */
-#include <linux/seq_file.h>
-#include <linux/cdev.h>
-#include <linux/irq.h>
-#include <linux/interrupt.h>
-
-#include <asm/system.h>		/* cli(), *_flags */
-#include <asm/uaccess.h>	/* copy_*_user */
-#include <asm/io.h>
-#include <asm/irq.h>
-#include <mach/irqs.h>
-
-#include <linux/platform_device.h>
-#include <linux/mutex.h>
-/* #include <linux/drivers/char/kovan_xilinx.h> */
-#include <mach/mfp-pxa168.h>
-#include <mach/regs-apbc.h>
-#include <mach/gpio.h>
-#include <plat/generic.h>
-#include <mach/addr-map.h>
-#include <asm/delay.h>
-#include <mach/regs-ssp.h>
-
 #include "kovan-kmod-spi.h"
 
 
