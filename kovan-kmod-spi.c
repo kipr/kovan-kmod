@@ -40,7 +40,7 @@
 #include <mach/regs-ssp.h>
 
 
-#define PXA_LOOPBACK_TEST 1
+#define PXA_LOOPBACK_TEST 0
 
 #ifndef SSCR0_MOD
 #define SSCR0_MOD	(1 << 31)
@@ -96,9 +96,11 @@ int rx_empty(void){
 	unsigned int sssr = __raw_readl(SSP3_SSSR);
 
 	if (sssr & SSSR_RNE){
-		return 0; // not empty
+		// not empty
+		return 0;
 	}else{
-		return 1; // empty
+		// empty
+		return 1;
 	}
 }
 
@@ -115,7 +117,7 @@ int kovan_flush_rx(void)
 {
 	char data = 0;
 
-	while (__raw_readl(SSP3_SSSR) & SSSR_RNE) {
+	while (!rx_empty()) {
 		data = __raw_readl(SSP3_SSDR);
 		printk("Read %d\n",data);
 	}
@@ -154,14 +156,12 @@ void init_spi(void)
 
 
 	// frame width 1f   (0x7= 8 clocks)
-	int sspsp = 0 | SSPSP_SFRMWDTH(0x16);
+	int sspsp = 0 | SSPSP_SFRMWDTH(0x7) | SSPSP_SCMODE(3); // frame active low  (SSRP_SFRMP doesnt seem to work ,have to use SSCR1_IFR)
 
-	// SFRMDIR    1, slave mode, SSPx port received SSPx_FRM
-	int sscr1 = 0;
-	if (PXA_LOOPBACK_TEST) sscr1 |= SSCR1_LBM;// | SSCR1_SFRMDIR;
+	int sscr1 = 0 | SSCR1_SPH | SSCR1_SPO;  // mode 3
+	if (PXA_LOOPBACK_TEST) sscr1 |= SSCR1_LBM;
 
-	//int sscr0 = 0 | SSCR0_EDSS | SSCR0_PSP | SSCR0_DataSize(8); // 8 bits
-	int sscr0 = 0 | SSCR0_MOD | SSCR0_Motorola | SSCR0_DataSize(16);
+	int sscr0 = 0 | SSCR0_MOD | SSCR0_Motorola | SSCR0_DataSize(8);
 
 
 	__raw_writel(sspsp, SSP3_SSPSP); // continuous clock on SSP3
@@ -193,9 +193,9 @@ void spi_test(void){
 	printk("Writing to SPI...\n");
 
 	int i;
-	static unsigned int num_vals_to_send = 300;
-	short buff_tx[num_vals_to_send];
-	short buff_rx[num_vals_to_send];
+	static unsigned int num_vals_to_send = 15;
+	unsigned char buff_tx[num_vals_to_send];
+	unsigned char buff_rx[num_vals_to_send];
 
 	for (i = 0; i < num_vals_to_send; i++){
 		buff_tx[i] = i;
@@ -203,7 +203,7 @@ void spi_test(void){
 	}
 
 	for (i = 0; i < num_vals_to_send; i++){
-		kovan_write_u16(buff_tx[i]);
+		kovan_write_u8(buff_tx[i]);
 		buff_rx[i] = __raw_readl(SSP3_SSDR);
 	}
 	for (i = 0; i < num_vals_to_send; i++){
