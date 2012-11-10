@@ -55,7 +55,7 @@ void cb_data(struct sock *sk, int bytes)
 
 struct StateResponse state()
 {
-	State ret;
+	struct State ret;
 	ret.t0 = 1;
 	ret.t1 = 2;
 	ret.t2 = 3;
@@ -89,14 +89,14 @@ unsigned char *do_packet(unsigned char *data, const unsigned int size)
 	struct Packet *packet = (struct Packet *)data;
 	
 	struct StateResponse response;
-	memset(&response, 0, sizeof(StateResponse));
+	memset(&response, 0, sizeof(struct StateResponse));
 	
 	for(unsigned short i = 0; i < packet->num; ++i) {
 		struct Command cmd = packet->commands[i];
 		
 		switch(cmd.type) {
 		case StateCommandType:
-			ret = state();
+			response = state();
 			break;
 		
 		case MotorCommandType:
@@ -111,7 +111,7 @@ unsigned char *do_packet(unsigned char *data, const unsigned int size)
 		}
 	}
 	
-	return ret;
+	return response;
 }
 
 #define UDP_HEADER_SIZE 8
@@ -141,7 +141,7 @@ void do_work(struct work_struct *data)
 		
 		struct iovec iov;
 		iov.iov_base = &response->state;
-		iov.iov_len  = sizeof(State);
+		iov.iov_len  = sizeof(struct State);
 		msg.msg_control = NULL;
 		msg.msg_controllen = 0;
 		msg.msg_iov = &iov;
