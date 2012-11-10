@@ -70,15 +70,11 @@ struct StateResponse state()
 void motor_command(struct MotorCommand *cmd)
 {
 	spi_test();
-	
-	return 0;
 }
 
 void digital_command(struct DigitalCommand *cmd)
 {
 	// Digital Command
-	
-	return 0;
 }
 
 struct StateResponse do_packet(unsigned char *data, const unsigned int size)
