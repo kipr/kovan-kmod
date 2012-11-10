@@ -131,7 +131,8 @@ void do_work(struct work_struct *data)
 		struct sockaddr_in to;
 		memset(&to, 0, sizeof(to));
 		to.sin_family = AF_INET;
-		to.sin_addr.s_addr = skb->nh.ip_hdr.saddr;
+		struct iphdr *ipinf = (struct iphdr *)skb_network_header(skb);
+		to.sin_addr.s_addr = ipinf->saddr;
 		to.sin_port = *((unsigned short *)skb->data);
 		
 		struct msghdr msg;
