@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include "../protocol.h"
 
 #define BUFFSIZE 5096 
 

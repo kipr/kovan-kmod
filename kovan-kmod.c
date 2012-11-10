@@ -2,12 +2,13 @@
  *
  * A kernel module to provide udp access to Kovan hardware
  *
- * Joshua Southerland
+ * Joshua Southerland and Braden McDorman
  *
  * Based on
  * http://people.ee.ethz.ch/~arkeller/linux/kernel_user_space_howto.html#s3
  *
  */
+
 #include <linux/in.h>
 #include <net/sock.h>
 #include <linux/skbuff.h>
@@ -19,139 +20,172 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 
-#include "kovan-kmod-spi.h"
+#include <stdint.h>
 
+#include "kovan-kmod-spi.h"
+#include "protocol.h"
 
 #define SERVER_PORT 5555
 
-static struct socket *udpsocket=NULL;
-static struct socket *clientsocket=NULL;
-
+static struct socket *udpsocket = NULL;
+static struct socket *clientsocket = NULL;
 
 struct wq_wrapper
 {
         struct work_struct worker;
-	struct sock * sk;
+	struct sock *sk;
 };
 
 struct wq_wrapper wq_data;
 
-
-
-static DECLARE_COMPLETION( threadcomplete );
+static DECLARE_COMPLETION(threadcomplete);
 struct workqueue_struct *wq;
-
-
 
 void cb_data(struct sock *sk, int bytes)
 {
-	printk("message received\n");
-
-	spi_test();
+	printk("Message Received\n");
 
 	wq_data.sk = sk;
 	queue_work(wq, &wq_data.worker);
 }
 
-void send_answer(struct work_struct *data)
+uint8_t *motor_command(struct MotorCommand *cmd)
 {
-	struct  wq_wrapper * foo = container_of(data, struct  wq_wrapper, worker);
+	spi_test();
+	
+	return 0;
+}
+
+uint8_t *digital_command(struct DigitalCommand *cmd)
+{
+	// Digital Command
+	
+	return 0;
+}
+
+uint8_t *do_packet(uint8_t *data, const uint32_t size)
+{
+	if(size != sizeof(Packet)) {
+		return 0; // Error: Packet is too small?
+	}
+	
+	struct Packet *packet = (struct Packet *)data;
+	
+	for(uint16_t i = 0; i < packet->num; ++i) {
+		struct Command cmd = packet->commands[i];
+		
+		switch(cmd.type) {
+		case MotorCommandType:
+			motor_command((struct MotorCommand *)cmd.data);
+			break;
+		
+		case DigitalCommandType:
+			digital_command((struct DigitalCommand *)cmd.data);
+			break;
+		
+		default: break;
+		}
+	}
+	
+	return 0;
+}
+
+#define UDP_HEADER_SIZE 8
+
+void do_work(struct work_struct *data)
+{
+	struct wq_wrapper *foo = container_of(data, struct wq_wrapper, worker);
+	
 	int len = 0;
-	/* as long as there are messages in the receive queue of this socket*/
-	while((len = skb_queue_len(&foo->sk->sk_receive_queue)) > 0){
-		struct sk_buff *skb = NULL;
-		unsigned short * port;
-		/* int len; */
-		struct msghdr msg;
-		struct iovec iov;
-		mm_segment_t oldfs;
+	while((len = skb_queue_len(&foo->sk->sk_receive_queue)) > 0) {
+		struct sk_buff *skb = skb_dequeue(&foo->sk->sk_receive_queue);
+		printk("Message len: %i Message: %s\n", skb->len - UDP_HEADER_SIZE, skb->data + UDP_HEADER_SIZE);
+		uint8_t *response = do_packet(skb->data + UDP_HEADER_SIZE, skb->len - UDP_HEADER_SIZE)
+		
+		if(!response) continue;
+		
 		struct sockaddr_in to;
-
-		/* receive packet */
-		skb = skb_dequeue(&foo->sk->sk_receive_queue);
-		printk("message len: %i message: %s\n", skb->len - 8, skb->data+8); /*8 for udp header*/
-
-		/* generate answer message */
-		memset(&to,0, sizeof(to));
+		memset(&to, 0, sizeof(to));
 		to.sin_family = AF_INET;
 		to.sin_addr.s_addr = in_aton("127.0.0.1");
-		port = (unsigned short *)skb->data;
+		unsigned short *port = (unsigned short *)skb->data;
 		to.sin_port = *port;
-		memset(&msg,0,sizeof(msg));
+		
+		struct msghdr msg;
+		memset(&msg, 0, sizeof(msg));
 		msg.msg_name = &to;
 		msg.msg_namelen = sizeof(to);
+		
+		struct iovec iov;
 		/* send the message back */
-		iov.iov_base = skb->data+8;
-		iov.iov_len  = skb->len-8;
+		iov.iov_base = skb->data + UDP_HEADER_SIZE;
+		iov.iov_len  = skb->len - UDP_HEADER_SIZE;
 		msg.msg_control = NULL;
 		msg.msg_controllen = 0;
 		msg.msg_iov = &iov;
 		msg.msg_iovlen = 1;
+		
 		/* adjust memory boundaries */
-		oldfs = get_fs();
+ 		mm_segment_t oldfs = get_fs();
 		set_fs(KERNEL_DS);
-		/* len = sock_sendmsg(clientsocket, &msg, skb->len-8); */
-		sock_sendmsg(clientsocket, &msg, skb->len-8);
+		
+		sock_sendmsg(clientsocket, &msg, skb->len - UDP_HEADER_SIZE);
+		
 		set_fs(oldfs);
-		/* free the initial skb */
 		kfree_skb(skb);
-		printk("message sent\n");
+		printk("Message Sent\n");
 	}
 }
 
-static int __init server_init( void )
+static int __init server_init(void)
 {
-
-
-	struct sockaddr_in server;
-	int servererror;
-	printk("INIT MODULE\n");
+	printk("Initing Kovan Module\n");
 
 	init_spi();
 	spi_test();
 
 	/* socket to receive data */
-	if (sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &udpsocket) < 0) {
-		printk( KERN_ERR "server: Error creating udpsocket.n" );
+	if(sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &udpsocket) < 0) {
+		printk(KERN_ERR "server: Error creating udpsocket.n\n");
 		return -EIO;
 	}
+	
+	struct sockaddr_in server;
 	server.sin_family = AF_INET;
 	server.sin_addr.s_addr = INADDR_ANY;
-	server.sin_port = htons( (unsigned short)SERVER_PORT);
-	servererror = udpsocket->ops->bind(udpsocket, (struct sockaddr *) &server, sizeof(server ));
-	if (servererror) {
+	server.sin_port = htons((unsigned short)SERVER_PORT);
+	
+	if(udpsocket->ops->bind(udpsocket, (struct sockaddr *)&server, sizeof(server))) {
 		sock_release(udpsocket);
 		return -EIO;
 	}
 	udpsocket->sk->sk_data_ready = cb_data;
 
 	/* create work queue */
-	INIT_WORK(&wq_data.worker, send_answer);
+	INIT_WORK(&wq_data.worker, do_work);
 	wq = create_singlethread_workqueue("myworkqueue");
-	if (!wq){
+	if(!wq) {
 		return -ENOMEM;
 	}
 
-	/* socket to send data */
-	if (sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &clientsocket) < 0) {
-		printk( KERN_ERR "server: Error creating clientsocket.n" );
+	if(sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &clientsocket) < 0) {
+		printk(KERN_ERR "server: Error creating clientsocket.n\n");
 		return -EIO;
 	}
 	return 0;
 }
 
-static void __exit server_exit( void )
+static void __exit server_exit(void)
 {
-	if (udpsocket)
-		sock_release(udpsocket);
-	if (clientsocket)
-		sock_release(clientsocket);
+	if(udpsocket) sock_release(udpsocket);
+	if(clientsocket) sock_release(clientsocket);
 
-	if (wq) {
+	if(wq) {
                 flush_workqueue(wq);
                 destroy_workqueue(wq);
 	}
-	printk("EXIT MODULE\n");
+	
+	printk("Exiting Kovan Module\n");
 }
 
 module_init(server_init);
