@@ -46,14 +46,14 @@ int main(int argc, char *argv[]) {
 	struct MotorCommand test;
 	
 	struct Command command;
-	command.cmd = MotorCommandType;
+	command.type = MotorCommandType;
 	memcpy(command.data, &test, sizeof(struct MotorCommand));
 	
 	unsigned int packet_size = 0;
 	struct Packet *packet = create_packet(1, &packet_size);
-	memcpy(packet.commands, command, sizeof(struct Command));
+	memcpy(packet->commands, &command, sizeof(struct Command));
 	
-	if(sendto(sock, packet, packet_size, 0, (struct sockaddr *)&sendsocket, sizeof(sendsocket)) != sendlen) {
+	if(sendto(sock, packet, packet_size, 0, (struct sockaddr *)&sendsocket, sizeof(sendsocket)) != packet_size) {
 		perror("sendto");
 		return -1;
 	}
