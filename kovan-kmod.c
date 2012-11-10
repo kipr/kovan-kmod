@@ -82,14 +82,14 @@ void digital_command(struct DigitalCommand *cmd)
 
 struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 {
+	struct StateResponse response;
+	memset(&response, 0, sizeof(struct StateResponse));
+	
 	if(size != sizeof(struct Packet)) {
-		return 0; // Error: Packet is too small?
+		return response; // Error: Packet is too small?
 	}
 	
 	struct Packet *packet = (struct Packet *)data;
-	
-	struct StateResponse response;
-	memset(&response, 0, sizeof(struct StateResponse));
 	
 	for(unsigned short i = 0; i < packet->num; ++i) {
 		struct Command cmd = packet->commands[i];
@@ -140,7 +140,7 @@ void do_work(struct work_struct *data)
 		msg.msg_namelen = sizeof(to);
 		
 		struct iovec iov;
-		iov.iov_base = &response->state;
+		iov.iov_base = &response.state;
 		iov.iov_len  = sizeof(struct State);
 		msg.msg_control = NULL;
 		msg.msg_controllen = 0;
