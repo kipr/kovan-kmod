@@ -11,7 +11,7 @@
 struct Packet *create_packet(const unsigned short num, unsigned int *packet_size)
 {
 	*packet_size = sizeof(struct Packet) + (sizeof(struct Command) * (num - 1));
-	struct Packet *packet = malloc(*packet_size);
+	struct Packet *packet = (struct Packet *)malloc(*packet_size);
 	packet->num = num;
 	return packet;
 }
