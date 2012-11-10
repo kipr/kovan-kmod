@@ -85,6 +85,7 @@ struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 	memset(&response, 0, sizeof(struct StateResponse));
 	
 	if(size < sizeof(struct Packet)) {
+		printk("Packet was too small!! Not processing.\n");
 		return response; // Error: Packet is too small?
 	}
 	
