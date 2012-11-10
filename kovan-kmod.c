@@ -60,7 +60,7 @@ struct StateResponse state()
 	ret.t1 = 2;
 	ret.t2 = 3;
 	
-	struct StateResponse respanse;
+	struct StateResponse response;
 	response.hasState = 1;
 	response.state = ret;
 	return response;
