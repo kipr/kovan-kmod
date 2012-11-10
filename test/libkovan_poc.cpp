@@ -108,6 +108,7 @@ bool KovanModule::send(const CommandVector& commands)
 {
 	uint32_t packetSize = 0;
 	Packet *packet = createPacket(commands.size(), packetSize);
+	memcpy(packet->commands, &commands[0], commands.size() * sizeof(Command));
 	
 	bool ret = true;
 	if(sendto(m_sock, packet, packetSize, 0, (sockaddr *)&m_out, sizeof(m_out)) != packetSize) {
