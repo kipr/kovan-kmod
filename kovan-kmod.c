@@ -36,7 +36,7 @@ struct wq_wrapper
 
 struct wq_wrapper wq_data;
 
-static DECLARE_COMPLETION(threadcomplete);
+// static DECLARE_COMPLETION( threadcomplete );
 struct workqueue_struct *wq;
 
 void cb_data(struct sock *sk, int bytes)
