@@ -156,17 +156,94 @@ void print_spi_regs()
 
 }
 
+void init_spi()
+{
+
+	unsigned long pin_config[] = {
+		/* FPGA PSP config */
+		MFP_CFG(GPIO90, AF3), /* ssp3_clk */
+		MFP_CFG(GPIO91, AF3), /* ssp3_frm */
+		MFP_CFG(GPIO92, AF3), /* ssp3_miso */
+		MFP_CFG(GPIO93, AF3), /* ssp3_mosi */
+	};
+
+	mfp_config(ARRAY_AND_SIZE(pin_config));
+
+	printk("SSP3 clock enable (26 MHz)\n" );
+	__raw_writel(0x23,(APB_VIRT_BASE + 0x1584c));
+	__raw_writel(0x27,(APB_VIRT_BASE + 0x1584c)); // reset the unit
+	__raw_writel(0x23,(APB_VIRT_BASE + 0x1584c));
+
+
+	// frame width 1f   (0x7= 8 clocks)
+	int sspsp = 0 | SSPSP_SFRMWDTH(0x16);
+
+	// SFRMDIR    1, slave mode, SSPx port received SSPx_FRM
+	int sscr1 = 0 | SSCR1_LBM;// | SSCR1_SFRMDIR;
+
+	//int sscr0 = 0 | SSCR0_EDSS | SSCR0_PSP | SSCR0_DataSize(8); // 8 bits
+	int sscr0 = 0 | SSCR0_MOD | SSCR0_Motorola | SSCR0_DataSize(16);
+
+
+	__raw_writel(sspsp, SSP3_SSPSP); // continuous clock on SSP3
+	__raw_writel(sscr1, SSP3_SSCR1); // this is actually a bizarre configuration
+	__raw_writel(sscr0, SSP3_SSCR0); // but it works.
+	__raw_writel(sscr0, SSP3_SSCR0); // but it works.
+
+	__raw_writel(1, SSP3_SSTSA);
+	__raw_writel(1, SSP3_SSRSA);
+
+	// enable ssp
+	sscr0 = sscr0 | SSCR0_SSE;
+	__raw_writel(sscr0, SSP3_SSCR0);
+
+}
+
+
+void spi_test(){
+	// check spi config
+	print_spi_regs();
+
+	// flush rx buffer
+	if (!rx_empty()) kovan_flush_rx();
+
+	// check spi config
+	print_spi_regs();
+
+	// writing to spi
+	printk("Writing to SPI...\n");
+
+	int i;
+	static unsigned int num_vals_to_send = 300;
+	short buff_tx[num_vals_to_send];
+	short buff_rx[num_vals_to_send];
+
+	for (i = 0; i < num_vals_to_send; i++){
+		buff_tx[i] = i;
+		buff_rx[i] = 0;
+	}
+
+	for (i = 0; i < num_vals_to_send; i++){
+		kovan_write_u16(buff_tx[i]);
+		buff_rx[i] = __raw_readl(SSP3_SSDR);
+	}
+	for (i = 0; i < num_vals_to_send; i++){
+		printk("Wrote %d Read %d\n",buff_tx[i], buff_rx[i]);
+	}
+
+	// check spi config
+	print_spi_regs();
+
+}
 
 void cb_data(struct sock *sk, int bytes)
 {
 	printk("message received\n");
 
-	  __raw_writel(0xdeadbeef, SSP3_SSDR);
-	  __raw_writel(0xdeadbeef, SSP3_SSDR);
+	spi_test();
 
-
-	wq_data.sk = sk;
-	queue_work(wq, &wq_data.worker);
+	//wq_data.sk = sk;
+	//queue_work(wq, &wq_data.worker);
 }
 
 void send_answer(struct work_struct *data)
@@ -219,87 +296,11 @@ static int __init server_init( void )
 {
 
 
-
 	struct sockaddr_in server;
 	int servererror;
 	printk("INIT MODULE\n");
 
-
-	unsigned long pin_config[] = {
-		/* FPGA PSP config */
-		MFP_CFG(GPIO90, AF3), /* ssp3_clk */
-		MFP_CFG(GPIO91, AF3), /* ssp3_frm */
-		MFP_CFG(GPIO92, AF3), /* ssp3_miso */
-		MFP_CFG(GPIO93, AF3), /* ssp3_mosi */
-	};
-
-	mfp_config(ARRAY_AND_SIZE(pin_config));
-
-	printk("SSP3 clock enable (26 MHz)\n" );
-	__raw_writel(0x23,(APB_VIRT_BASE + 0x1584c));
-	__raw_writel(0x27,(APB_VIRT_BASE + 0x1584c)); // reset the unit
-	__raw_writel(0x23,(APB_VIRT_BASE + 0x1584c));
-
-
-	// frame width 1f   (0x7= 8 clocks)
-	int sspsp = 0 | SSPSP_SFRMWDTH(0x7);
-
-	// SFRMDIR    1, slave mode, SSPx port received SSPx_FRM
-	int sscr1 = 0 | SSCR1_LBM;// | SSCR1_SFRMDIR;
-
-	//int sscr0 = 0 | SSCR0_EDSS | SSCR0_PSP | SSCR0_DataSize(8); // 8 bits
-	int sscr0 = 0 | SSCR0_MOD | SSCR0_Motorola | SSCR0_DataSize(8); // 8 bits
-
-
-	__raw_writel(sspsp, SSP3_SSPSP); // continuous clock on SSP3
-	__raw_writel(sscr1, SSP3_SSCR1); // this is actually a bizarre configuration
-	__raw_writel(sscr0, SSP3_SSCR0); // but it works.
-	__raw_writel(sscr0, SSP3_SSCR0); // but it works.
-
-	__raw_writel(1, SSP3_SSTSA);
-	__raw_writel(1, SSP3_SSRSA);
-
-	// enable ssp
-	sscr0 = sscr0 | SSCR0_SSE;
-	__raw_writel(sscr0, SSP3_SSCR0);
-
-	// check spi config
-	print_spi_regs();
-
-	// flush rx buffer
-	if (!rx_empty()) kovan_flush_rx();
-
-	// check spi config
-	print_spi_regs();
-
-	// writing to spi
-	printk("Writing to SPI...\n");
-
-	int i;
-	char buff_tx[100];
-	char buff_rx[100];
-
-	for (i = 0; i < 100; i++){
-		buff_tx[i] = i;
-		buff_rx[i] = 0;
-	}
-
-	for (i = 0; i < 100; i++){
-		kovan_write_u8(0xAE);//buff_tx[i]);
-		buff_rx[i] = __raw_readl(SSP3_SSDR);
-	}
-	for (i = 0; i < 100; i++){
-		printk("Wrote %d Read %d\n",buff_tx[i], buff_rx[i]);
-	}
-
-	printk("Wrote %d times\n",i);
-
-	// check spi config
-	print_spi_regs();
-
-
-
-
+	init_spi();
 
 	/* socket to receive data */
 	if (sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &udpsocket) < 0) {
