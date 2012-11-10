@@ -1,6 +1,6 @@
 obj-m := kovan.o
 kovan-objs := kovan-kmod.o kovan-kmod-spi.o
-ccflags-y := -c99 -std=gnu99
+ccflags-y := -std=gnu99 -Wno-declaration-after-statement
 
 KLOC = ../linux
 all:
