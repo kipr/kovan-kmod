@@ -64,11 +64,13 @@ struct StateResponse state()
 	struct StateResponse response;
 	response.hasState = 1;
 	response.state = ret;
+	printk("State called\n");
 	return response;
 }
 
 void motor_command(struct MotorCommand *cmd)
 {
+	printk("Motor Command called\n");
 	spi_test();
 }
 
@@ -123,13 +125,18 @@ void do_work(struct work_struct *data)
 		printk("Message Length: %i Message: %s\n", skb->len - UDP_HEADER_SIZE, skb->data + UDP_HEADER_SIZE);
 		struct StateResponse response = do_packet(skb->data + UDP_HEADER_SIZE, skb->len - UDP_HEADER_SIZE);
 		
-		if(!response.hasState) continue;
+		if(!response.hasState) {
+			printk("No State to send back. Continuing...\n");
+			continue;
+		}
+		printk("Sending State Back...\n");
 		
 		struct sockaddr_in to;
 		memset(&to, 0, sizeof(to));
 		to.sin_family = AF_INET;
 		struct iphdr *ipinf = (struct iphdr *)skb_network_header(skb);
 		to.sin_addr.s_addr = ipinf->saddr;
+		printk(" @_SRC: %d.%d.%d.%d\n",NIPQUAD(ipinf->saddr));
 		to.sin_port = *((unsigned short *)skb->data);
 		
 		struct msghdr msg;
@@ -148,7 +155,7 @@ void do_work(struct work_struct *data)
 		/* adjust memory boundaries */
  		mm_segment_t oldfs = get_fs();
 		set_fs(KERNEL_DS);
-		
+		printk("sock_sendmsg\n");
 		sock_sendmsg(clientsocket, &msg, iov.iov_len);
 		
 		set_fs(oldfs);
