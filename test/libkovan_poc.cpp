@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <vector>
@@ -18,8 +22,8 @@ public:
 	bool bind(const uint64_t& address, const uint16_t& port);
 	void close();
 	
-	const uint64_t& moduleAddress() const;
-	const uint16_t& modulePort() const;
+	uint64_t moduleAddress() const;
+	uint16_t modulePort() const;
 	
 	bool send(const Command& command);
 	bool send(const CommandVector& commands);
@@ -34,7 +38,7 @@ private:
 KovanModule::KovanModule(const uint64_t& moduleAddress, const uint16_t& modulePort)
 	: m_sock(-1)
 {
-	memset(&m_out, 0, sizeof(m)out));
+	memset(&m_out, 0, sizeof(m_out));
 	m_out.sin_family = AF_INET;
 	m_out.sin_addr.s_addr = moduleAddress;
 	m_out.sin_port = modulePort;
@@ -84,12 +88,12 @@ void KovanModule::close()
 	::close(m_sock);
 }
 
-const uint64_t& KovanModule::moduleAddress() const
+uint64_t KovanModule::moduleAddress() const
 {
 	return m_out.sin_addr.s_addr;
 }
 
-const uint16_t& KovanModule::modulePort() const
+uint16_t KovanModule::modulePort() const
 {
 	return m_out.sin_port;
 }
