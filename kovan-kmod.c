@@ -20,8 +20,6 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 
-#include <stdint.h>
-
 #include "kovan-kmod-spi.h"
 #include "protocol.h"
 
@@ -49,29 +47,29 @@ void cb_data(struct sock *sk, int bytes)
 	queue_work(wq, &wq_data.worker);
 }
 
-uint8_t *motor_command(struct MotorCommand *cmd)
+unsigned char *motor_command(struct MotorCommand *cmd)
 {
 	spi_test();
 	
 	return 0;
 }
 
-uint8_t *digital_command(struct DigitalCommand *cmd)
+unsigned char *digital_command(struct DigitalCommand *cmd)
 {
 	// Digital Command
 	
 	return 0;
 }
 
-uint8_t *do_packet(uint8_t *data, const uint32_t size)
+unsigned char *do_packet(unsigned char *data, const unsigned int size)
 {
-	if(size != sizeof(Packet)) {
+	if(size != sizeof(struct Packet)) {
 		return 0; // Error: Packet is too small?
 	}
 	
 	struct Packet *packet = (struct Packet *)data;
 	
-	for(uint16_t i = 0; i < packet->num; ++i) {
+	for(unsigned short i = 0; i < packet->num; ++i) {
 		struct Command cmd = packet->commands[i];
 		
 		switch(cmd.type) {
@@ -100,7 +98,7 @@ void do_work(struct work_struct *data)
 	while((len = skb_queue_len(&foo->sk->sk_receive_queue)) > 0) {
 		struct sk_buff *skb = skb_dequeue(&foo->sk->sk_receive_queue);
 		printk("Message len: %i Message: %s\n", skb->len - UDP_HEADER_SIZE, skb->data + UDP_HEADER_SIZE);
-		uint8_t *response = do_packet(skb->data + UDP_HEADER_SIZE, skb->len - UDP_HEADER_SIZE)
+		unsigned char *response = do_packet(skb->data + UDP_HEADER_SIZE, skb->len - UDP_HEADER_SIZE);
 		
 		if(!response) continue;
 		

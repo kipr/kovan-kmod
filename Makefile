@@ -1,6 +1,7 @@
 obj-m := kovan.o
 kovan-objs := kovan-kmod.o kovan-kmod-spi.o
-ccflags-y := -std=gnu99
+ccflags-y := -c99 -std=gnu99
+
 KLOC = ../linux
 all:
 	make -C $(KLOC) M=$(PWD) modules

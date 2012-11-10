@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+
 #define MAX_COMMAND_DATA_SIZE 16
 
 enum CommandType
@@ -17,25 +18,25 @@ enum CommandType
 struct Command
 {
 	enum CommandType type;
-	uint8_t data[MAX_COMMAND_DATA_SIZE];
+	unsigned char data[MAX_COMMAND_DATA_SIZE];
 };
 
 struct Packet
 {
-	uint16_t num;
+	unsigned short num;
 	struct Command *commands;
 };
 
 struct MotorCommand
 {
-	uint8_t port; // 0 - 3
-	uint8_t power; // 0 - 255
+	unsigned char port; // 0 - 3
+	unsigned char power; // 0 - 255
 };
 
 struct DigitalCommand
 {
-	uint8_t port; // 0 - 7
-	uint8_t on : 1;
+	unsigned char port; // 0 - 7
+	unsigned char on : 1;
 };
 
 #ifdef __cplusplus
