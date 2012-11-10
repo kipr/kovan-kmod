@@ -80,7 +80,7 @@ void digital_command(struct DigitalCommand *cmd)
 	return 0;
 }
 
-unsigned char *do_packet(unsigned char *data, const unsigned int size)
+struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 {
 	if(size != sizeof(struct Packet)) {
 		return 0; // Error: Packet is too small?
@@ -131,7 +131,7 @@ void do_work(struct work_struct *data)
 		struct sockaddr_in to;
 		memset(&to, 0, sizeof(to));
 		to.sin_family = AF_INET;
-		to.sin_addr.s_addr = skb->addr;
+		to.sin_addr.s_addr = skb->nh.ip_hdr.saddr;
 		to.sin_port = *((unsigned short *)skb->data);
 		
 		struct msghdr msg;
