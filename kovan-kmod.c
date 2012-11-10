@@ -14,6 +14,7 @@
 #include <linux/skbuff.h>
 #include <linux/delay.h>
 #include <linux/inet.h>
+#include <linux/ip.h>
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
