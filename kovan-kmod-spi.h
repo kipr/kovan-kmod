@@ -10,7 +10,7 @@
 
 int kovan_write_u8(unsigned char data);
 
-int kovan_write_u16(unsigned int data);
+int kovan_write_u16(unsigned short data);
 
 int rx_empty(void);
 

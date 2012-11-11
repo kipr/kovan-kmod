@@ -77,7 +77,7 @@ int kovan_write_u8(unsigned char data)
 
 
 //static int u8_writer(struct driver_data *drv_data)
-int kovan_write_u16(unsigned int data)
+int kovan_write_u16(unsigned short data)
 {
 	unsigned int sssr = __raw_readl(SSP3_SSSR);
 
@@ -168,12 +168,12 @@ void init_spi(void)
 
 
 	// frame width 1f   (0x7= 8 clocks)
-	int sspsp = 0 | SSPSP_SFRMWDTH(0x7); // | SSPSP_SCMODE(3); // frame active low  (SSRP_SFRMP doesnt seem to work ,have to use SSCR1_IFR)
+	int sspsp = 0 | SSPSP_SFRMWDTH(0x15); // | SSPSP_SCMODE(3); // frame active low  (SSRP_SFRMP doesnt seem to work ,have to use SSCR1_IFR)
 
 	int sscr1 = 0; // | SSCR1_SPH | SSCR1_SPO;  // mode 3
 	if (PXA_LOOPBACK_TEST) sscr1 |= SSCR1_LBM;
 
-	int sscr0 = 0 | SSCR0_MOD | SSCR0_Motorola | SSCR0_DataSize(8);
+	int sscr0 = 0 | SSCR0_MOD | SSCR0_Motorola | SSCR0_DataSize(16);
 
 
 	__raw_writel(sspsp, SSP3_SSPSP); // continuous clock on SSP3
@@ -199,6 +199,7 @@ void spi_test(void){
 	if (!rx_empty()) kovan_flush_rx();
 
 	int i;
+	// FIXME:
 	for (i = 0; i < 16; i++){
 	__raw_readl(SSP3_SSDR);
 	}
@@ -211,25 +212,24 @@ void spi_test(void){
 
 
 	static unsigned int num_vals_to_send = 15;
-	unsigned char buff_tx[15] = {0,1,1,2,3,3,3,4,5,6,7,7,8,10,11};
-	unsigned char buff_rx[num_vals_to_send];
+	unsigned short buff_tx[num_vals_to_send];
+	unsigned short buff_rx[num_vals_to_send];
 
 	for (i = 0; i < num_vals_to_send; i++){
-		//buff_tx[i] = i;
+		buff_tx[i] = 120+i;
 		buff_rx[i] = 0;
 	}
 
 	unsigned int ssp3_val;
 	for (i = 0; i < num_vals_to_send; i++){
-		kovan_write_u8(buff_tx[i]);
+		kovan_write_u16(buff_tx[i]);
 
 		do{
 			ssp3_val == __raw_readl(SSP3_SSSR);
 		}while(ssp3_val & SSSR_BSY);
-
+		udelay(1); // FIXME
 		buff_rx[i] = __raw_readl(SSP3_SSDR);
 	}
-
 	for (i = 0; i < num_vals_to_send; i++){
 		printk("Wrote %d Read %d\n",buff_tx[i], buff_rx[i]);
 	}
