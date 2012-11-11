@@ -211,12 +211,16 @@ void spi_test(void){
 	printk("Writing to SPI...\n");
 
 
-	static unsigned int num_vals_to_send = 15;
-	unsigned short buff_tx[num_vals_to_send];
+	static unsigned int num_vals_to_send = 16;
+	unsigned short buff_tx[16] = {
+			0x0000,0x0000,0x0000,0x0000,
+			0x4000,0x4000,0x4000,0x4000,
+			0x8000,0x8000,0x8000,0x8000,
+			0xC000,0xC000,0xC000,0xC000};//[num_vals_to_send];
 	unsigned short buff_rx[num_vals_to_send];
 
 	for (i = 0; i < num_vals_to_send; i++){
-		buff_tx[i] = 120+i;
+		//buff_tx[i] = 120+i;
 		buff_rx[i] = 0;
 	}
 
