@@ -191,54 +191,136 @@ void init_spi(void)
 }
 
 
-void spi_test(void){
-	// check spi config
-	print_spi_regs();
+void read_vals()
+{
+//	printk("Reading registers...\n");
 
-	// flush rx buffer
-	if (!rx_empty()) kovan_flush_rx();
+	static unsigned int num_vals_to_send = 64;
+	short buff_rx[num_vals_to_send];
 
 	int i;
+
+	//FIXME make sure we get back to a waiting state
+	kovan_write_u16(0x0000);
+	udelay(1);
+	kovan_write_u16(0x0000);
+	udelay(1);
+
+
 	// FIXME:
 	for (i = 0; i < 16; i++){
+		__raw_readl(SSP3_SSDR);
+		udelay(1);
+	}
+
+
+	// init xfer
+	kovan_write_u16(0x8000);
+
+	unsigned int ssp3_val = 0;
+	do{
+		ssp3_val == __raw_readl(SSP3_SSSR);
+	}while(ssp3_val & SSSR_BSY);
+	udelay(1); // FIXME
 	__raw_readl(SSP3_SSDR);
-	}
-
-	// check spi config
-	print_spi_regs();
-
-	// writing to spi
-	printk("Writing to SPI...\n");
 
 
-	static unsigned int num_vals_to_send = 16;
-	unsigned short buff_tx[16] = {
-			0x0000,0x0000,0x0000,0x0000,
-			0x4000,0x4000,0x4000,0x4000,
-			0x8000,0x8000,0x8000,0x8000,
-			0xC000,0xC000,0xC000,0xC000};//[num_vals_to_send];
-	unsigned short buff_rx[num_vals_to_send];
-
+	// read vals
 	for (i = 0; i < num_vals_to_send; i++){
-		//buff_tx[i] = 120+i;
-		buff_rx[i] = 0;
-	}
 
-	unsigned int ssp3_val;
-	for (i = 0; i < num_vals_to_send; i++){
-		kovan_write_u16(buff_tx[i]);
+		kovan_write_u16(0x8000);
 
 		do{
-			ssp3_val == __raw_readl(SSP3_SSSR);
+			ssp3_val = __raw_readl(SSP3_SSSR);
 		}while(ssp3_val & SSSR_BSY);
 		udelay(1); // FIXME
 		buff_rx[i] = __raw_readl(SSP3_SSDR);
 	}
-	for (i = 0; i < num_vals_to_send; i++){
-		printk("Wrote %d Read %d\n",buff_tx[i], buff_rx[i]);
+
+//	for (i = 0; i < num_vals_to_send; i+=8){
+//		printk("%d:%d [%d,%d,%d,%d,%d,%d,%d,%d]\n",i,i+7,
+//				 buff_rx[i], buff_rx[i+1], buff_rx[i+2], buff_rx[i+3],
+//				 buff_rx[i+4], buff_rx[i+5], buff_rx[i+6], buff_rx[i+7]);
+//	}
+}
+
+
+void write_test()
+{
+
+	//  can write to registers 24-63
+
+
+	unsigned short i;
+	unsigned short first_reg = 24;
+	unsigned short last_reg = 63;
+	unsigned short buff_rx[40]; // 40 command registers
+//	printk("Writing to registers...\n");
+
+
+	//FIXME make sure we get back to a waiting state
+	kovan_write_u16(0x0000);
+	udelay(1);
+	kovan_write_u16(0x0000);
+	udelay(1);
+
+	// FIXME: flushing
+	for (i = 0; i < 16; i++){
+	__raw_readl(SSP3_SSDR);
+	udelay(1);
 	}
 
+
+
+
+
+	unsigned short matches = 0;
+	unsigned int ssp3_val = 0;
+	for (i = first_reg; i <= last_reg; i++){
+
+		// init write + send register
+		kovan_write_u16(0x4000 + i);
+
+		do{
+			ssp3_val = __raw_readl(SSP3_SSSR);
+		}while(ssp3_val & SSSR_BSY);
+		udelay(1); // FIXME
+		__raw_readl(SSP3_SSDR);
+
+		// send value, complete write
+		kovan_write_u16(i);
+		do{
+			ssp3_val == __raw_readl(SSP3_SSSR);
+		}while(ssp3_val & SSSR_BSY);
+		udelay(1); // FIXME
+		buff_rx[i-first_reg] = __raw_readl(SSP3_SSDR);
+
+		if (buff_rx[i-first_reg] == i-1) matches += 1;
+	}
+
+//	printk("Writing complete.  %d/%d matched\n", matches, (last_reg-first_reg)+1);
+}
+
+
+void spi_test(void){
 	// check spi config
 	print_spi_regs();
 
+	int i = 0;
+
+	printk("start read...\n");
+	for (i = 0; i < 100; i++){
+		read_vals();
+	}
+	printk("done 100 reads, start write:...\n");
+	for (i = 0; i < 100; i++){
+		write_test();
+	}
+	printk("done 100 writes\n");
+
+
+
+
+	// check spi config
+	print_spi_regs();
 }
