@@ -55,9 +55,18 @@
 #define SSP3_SSTSA		(APB_VIRT_BASE + 0x1f030)
 #define SSP3_SSRSA		(APB_VIRT_BASE + 0x1f034)
 
-
-#define NUM_SPI_REGS 64
-unsigned short buff_rx[NUM_SPI_REGS];
+// The FPGA currently has 64 registers but can address up to 1024
+// The 6 most significant bits in a message are reserved currently for command type
+// This would allow for 32 different commands, however the fpga is currently
+// pretending only the 2 most significant bits are important
+// resulting in:
+// 10 = read
+// 01 = write
+// 00 = start/undefined
+// 11 = start/undefined
+#define START_CMD 0x0000
+#define WRITE_CMD 0x4000
+#define READ_CMD 0x8000
 
 
 int kovan_write_u8(unsigned char data)
@@ -103,7 +112,7 @@ int rx_empty(void)
 }
 
 
-inline int spi_busy(void){
+int spi_busy(void){
 
 	if (__raw_readl(SSP3_SSSR) & SSSR_BSY){}; return 1;
 
@@ -167,12 +176,12 @@ void print_spi_regs(void)
 }
 
 
-void print_rx_buffer()
+void print_rx_buffer(unsigned short *buff_rx, unsigned short num_spi_regs)
 {
 
 	unsigned int i;
 
-	for (i = 0; i < NUM_SPI_REGS; i+=8){
+	for (i = 0; i < num_spi_regs; i+=8){
 		printk("%d:%d [%d,%d,%d,%d,%d,%d,%d,%d]\n",i,i+7,
 				 buff_rx[i], buff_rx[i+1], buff_rx[i+2], buff_rx[i+3],
 				 buff_rx[i+4], buff_rx[i+5], buff_rx[i+6], buff_rx[i+7]);
@@ -222,75 +231,98 @@ void init_spi(void)
 }
 
 
-void read_vals()
+void read_vals(unsigned short *buff_rx, unsigned short num_vals_to_read)
 {
 	int i;
 	unsigned int ssp3_val = 0;
-	static unsigned int num_vals_to_read = NUM_SPI_REGS;
-	short buff_rx_tmp[num_vals_to_read];
 
 
 	//make sure we get back to a waiting state
-	kovan_write_u16(0x0000);
+	kovan_write_u16(START_CMD);
 	udelay(1);
-	kovan_write_u16(0x0000);
+	kovan_write_u16(START_CMD);
 	udelay(1);
 
 	kovan_flush_rx();
 
 	// init xfer
-	kovan_write_u16(0x8000);
-	buff_rx_tmp[0] = kovan_read_u16();
+	kovan_write_u16(READ_CMD);
+	buff_rx[0] = kovan_read_u16();
 
 	// read vals
 	for (i = 0; i < num_vals_to_read; i++){
-		kovan_write_u16(0x8000);
-		buff_rx_tmp[i] = kovan_read_u16();
-	}
-
-	for (i = 0; i < num_vals_to_read; i++){
-		buff_rx[i] = buff_rx_tmp[i];
+		kovan_write_u16(READ_CMD);
+		buff_rx[i] = kovan_read_u16();
 	}
 }
 
-//  can write to registers 24-63
-void write_test()
+//FIXME: constants
+void write_vals(unsigned short *addys, unsigned short *vals, unsigned short num_vals_to_send)
 {
 	unsigned short i;
-	unsigned short first_reg = 24;
-	unsigned short last_reg = 63;
 	unsigned short buff_rx_tmp[40]; // 40 command registers
 	unsigned int ssp3_val = 0;
 
 	//make sure we get back to a waiting state
-	kovan_write_u16(0x0000);
+	kovan_write_u16(START_CMD);
 	udelay(1);
-	kovan_write_u16(0x0000);
+	kovan_write_u16(START_CMD);
 	udelay(1);
-
 
 	kovan_flush_rx();
 
-	for (i = first_reg; i <= last_reg; i++){
+	for (i = 0; i < num_vals_to_send; i++){
 
 		// init write + send register
-		kovan_write_u16(0x4000 + i);
+		kovan_write_u16(WRITE_CMD + addys[i]);
 
 		// send value, complete write
-		kovan_write_u16(i);
-		buff_rx_tmp[i-first_reg] = kovan_read_u16();
+		kovan_write_u16(vals[i]);
+		buff_rx_tmp[i] = kovan_read_u16();
 	}
+
+	//TODO: check return value from each write?
 }
 
 
+
+//  can write to registers 24-63
+//FIXME: constants
+void write_test(void)
+{
+	unsigned short i;
+	unsigned short first_reg = 24;
+	unsigned short last_reg = 63;
+
+	unsigned short num_vals_to_send = 40;
+	unsigned short vals[40]; // 40 command registers
+	unsigned short addys[40]; // 40 command registers
+
+	unsigned int addy_cnt = 0;
+
+	for (i = first_reg; i <= last_reg; i++){
+		vals[addy_cnt] = i;
+		addys[addy_cnt] = i;
+		addy_cnt+=1;
+	}
+
+	write_vals(addys, vals, num_vals_to_send);
+}
+
+
+//FIXME: constants
 void spi_test(void)
 {
+
+	const static short num_regs = 64; // NUM_FPGA_REGS
+	unsigned short rx_buff[64];
+
 	// check spi config
 	print_spi_regs();
 
 	printk("Reading...\n");
-	read_vals();
-	print_rx_buffer();
+	read_vals(rx_buff, num_regs);
+	print_rx_buffer(rx_buff, num_regs);
 
 
 	printk("Writing...\n");
@@ -298,8 +330,8 @@ void spi_test(void)
 
 
 	printk("Reading...\n");
-	read_vals();
-	print_rx_buffer();
+	read_vals(rx_buff, num_regs);
+	print_rx_buffer(rx_buff, num_regs);
 
 	// check spi config
 	print_spi_regs();

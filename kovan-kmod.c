@@ -57,15 +57,35 @@ void cb_data(struct sock *sk, int bytes)
 struct StateResponse state()
 {
 	struct State ret;
-	ret.t0 = 1;
-	ret.t1 = 2;
-	ret.t2 = 3;
-	
+
+	read_vals(ret.t, NUM_FPGA_REGS); // TODO: poor naming is poor
+
 	struct StateResponse response;
 	response.hasState = 1;
 	response.state = ret;
 	printk("State called\n");
 	return response;
+}
+
+
+//write registers starting at register 0
+// even though RW don't
+void write_vals_auto_offset(unsigned short *addys, unsigned short *vals, unsigned short num_vals_to_send)
+{
+	unsigned short i;
+
+	for (i=0; i < num_vals_to_send; i++){
+		addys += RW_REG_OFFSET;
+	}
+
+	// TODO: const
+	write_vals(addys, vals, num_vals_to_send);
+
+	// put the old reg vals back just in case
+	for (i=0; i < num_vals_to_send; i++){
+		addys -= RW_REG_OFFSET;
+	}
+
 }
 
 void motor_command(struct MotorCommand *cmd)
@@ -78,6 +98,7 @@ void digital_command(struct DigitalCommand *cmd)
 {
 	// Digital Command
 }
+
 
 struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 {
@@ -172,7 +193,6 @@ static int __init server_init(void)
 	printk("Initing Kovan Module\n");
 
 	init_spi();
-	spi_test();
 
 	/* socket to receive data */
 	if(sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &udpsocket) < 0) {

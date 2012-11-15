@@ -7,6 +7,7 @@ extern "C" {
 
 
 #define MAX_COMMAND_DATA_SIZE 16
+#define NUM_FPGA_REGS 64
 
 enum CommandType
 {
@@ -42,9 +43,7 @@ struct DigitalCommand
 
 struct State
 {
-	unsigned int t0;
-	unsigned int t1;
-	unsigned int t2;
+	unsigned short t[NUM_FPGA_REGS];
 };
 
 #ifdef __cplusplus

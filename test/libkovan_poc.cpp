@@ -175,7 +175,14 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	
-	std::cout << "state.t0 = " << state.t0 << "; t1 = " << state.t1 << "; t2 = " << state.t2 << std::endl;
-	
+	int i;
+	std::cout << "State: " << std::endl;
+	for (i = 0; i < NUM_FPGA_REGS; i+=4){
+		std::cout << "\t"
+				<< state.t[i]   << ", "
+				<< state.t[i+1] << ", "
+				<< state.t[i+2] << ", "
+				<< state.t[i+3] << std::endl;
+	}
 	return 0;
 }
