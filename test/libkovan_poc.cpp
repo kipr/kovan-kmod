@@ -156,10 +156,12 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	
-	MotorCommand test;
+	WriteCommand test;
+	test.addy = 3;
+	test.val = 100;
 	Command command;
-	command.type = MotorCommandType;
-	memcpy(command.data, &test, sizeof(MotorCommand));
+	command.type = WriteCommandType;
+	memcpy(command.data, &test, sizeof(WriteCommand));
 	
 	Command command1;
 	command1.type = StateCommandType;
@@ -184,5 +186,6 @@ int main(int argc, char *argv[])
 				<< state.t[i+2] << ", "
 				<< state.t[i+3] << std::endl;
 	}
+
 	return 0;
 }

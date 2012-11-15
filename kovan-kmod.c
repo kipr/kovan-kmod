@@ -26,12 +26,14 @@
 
 #define SERVER_PORT 5555
 
+#define WRITE_COMMAND_BUFF_SIZE 64
+
 static struct socket *udpsocket = NULL;
 static struct socket *clientsocket = NULL;
 
 struct wq_wrapper
 {
-        struct work_struct worker;
+	struct work_struct worker;
 	struct sock *sk;
 };
 
@@ -75,7 +77,7 @@ void write_vals_auto_offset(unsigned short *addys, unsigned short *vals, unsigne
 	unsigned short i;
 
 	for (i=0; i < num_vals_to_send; i++){
-		addys += RW_REG_OFFSET;
+		addys[i] += RW_REG_OFFSET;
 	}
 
 	// TODO: const
@@ -88,20 +90,15 @@ void write_vals_auto_offset(unsigned short *addys, unsigned short *vals, unsigne
 
 }
 
-void motor_command(struct MotorCommand *cmd)
-{
-	printk("Motor Command called\n");
-	spi_test();
-}
-
-void digital_command(struct DigitalCommand *cmd)
-{
-	// Digital Command
-}
-
 
 struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 {
+	int have_state_request = 0;
+
+	int num_write_commands = 0;
+	unsigned short write_addys[WRITE_COMMAND_BUFF_SIZE];
+	unsigned short write_vals[WRITE_COMMAND_BUFF_SIZE];
+
 	struct StateResponse response;
 	memset(&response, 0, sizeof(struct StateResponse));
 	
@@ -119,21 +116,32 @@ struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 		
 		switch(cmd.type) {
 		case StateCommandType:
-			response = state();
+			have_state_request = 1;
 			break;
 		
-		case MotorCommandType:
-			motor_command((struct MotorCommand *)cmd.data);
-			break;
-		
-		case DigitalCommandType:
-			digital_command((struct DigitalCommand *)cmd.data);
+		case WriteCommandType:
+			if (num_write_commands < WRITE_COMMAND_BUFF_SIZE){
+				struct WriteCommand *w_cmd = (struct WriteCommand*) &(cmd.data);
+				write_addys[num_write_commands] = 	w_cmd->addy;
+				write_vals[num_write_commands] = 	w_cmd->val;
+				if (write_addys[num_write_commands] < NUM_RW_REGS){
+					num_write_commands += 1;
+				} // otherwise ignore this out of range request
+			}// no more room for write commands
 			break;
 		
 		default: break;
 		}
 	}
 	
+	if (num_write_commands > 0){
+		write_vals_auto_offset(write_addys, write_vals, num_write_commands);
+	}
+
+	if (have_state_request){
+		response = state();
+	}
+
 	return response;
 }
 
@@ -146,7 +154,7 @@ void do_work(struct work_struct *data)
 	int len = 0;
 	while((len = skb_queue_len(&foo->sk->sk_receive_queue)) > 0) {
 		struct sk_buff *skb = skb_dequeue(&foo->sk->sk_receive_queue);
-		printk("Message Length: %i Message: %s\n", skb->len - UDP_HEADER_SIZE, skb->data + UDP_HEADER_SIZE);
+		printk("Message : %i Message: %s\n", skb->len - UDP_HEADER_SIZE, skb->data + UDP_HEADER_SIZE);
 		struct StateResponse response = do_packet(skb->data + UDP_HEADER_SIZE, skb->len - UDP_HEADER_SIZE);
 		
 		if(!response.hasState) {

@@ -13,8 +13,7 @@ enum CommandType
 {
 	NilType = 0,
 	StateCommandType,
-	MotorCommandType,
-	DigitalCommandType
+	WriteCommandType
 };
 
 struct Command
@@ -29,16 +28,10 @@ struct Packet
 	struct Command commands[1];
 };
 
-struct MotorCommand
+struct WriteCommand
 {
-	unsigned char port; // 0 - 3
-	unsigned char power; // 0 - 255
-};
-
-struct DigitalCommand
-{
-	unsigned char port; // 0 - 7
-	unsigned char on : 1;
+	unsigned short addy; // 0 - 40
+	unsigned short val; // 0 - 0xFFFF
 };
 
 struct State

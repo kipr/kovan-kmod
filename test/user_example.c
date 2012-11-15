@@ -44,11 +44,11 @@ int main(int argc, char *argv[]) {
 	sendsocket.sin_port = htons(5555);
 
 	/* Send message to the server */
-	struct MotorCommand test;
+	struct WriteCommand test;
 	
 	struct Command command;
-	command.type = MotorCommandType;
-	memcpy(command.data, &test, sizeof(struct MotorCommand));
+	command.type = WriteCommandType;
+	memcpy(command.data, &test, sizeof(struct WriteCommand));
 	
 	unsigned int packet_size = 0;
 	struct Packet *packet = create_packet(1, &packet_size);
