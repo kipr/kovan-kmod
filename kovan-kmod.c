@@ -28,7 +28,10 @@
 
 #define WRITE_COMMAND_BUFF_SIZE NUM_RW_REGS
 
-#define KOVAN_KMOD_DEBUG 1
+#define KOVAN_KMOD_DEBUG 0
+#define KOVAN_KMOD_WARN 0
+#define KOVAN_KMOD_ERROR 1
+
 
 static struct socket *udpsocket = NULL;
 static struct socket *clientsocket = NULL;
@@ -52,7 +55,7 @@ struct workqueue_struct *wq;
 
 void cb_data(struct sock *sk, int bytes)
 {
-	//printk("Message Received\n");
+	if(KOVAN_KMOD_DEBUG) printk("Message Received\n");
 
 	wq_data.sk = sk;
 	queue_work(wq, &wq_data.worker);
@@ -72,27 +75,6 @@ struct StateResponse state()
 }
 
 
-//write registers starting at register 0
-// even though RW don't
-void write_vals_auto_offset(unsigned short *addys, unsigned short *vals, unsigned short num_vals_to_send)
-{
-	unsigned short i;
-
-	for (i=0; i < num_vals_to_send; i++){
-		addys[i] += RW_REG_OFFSET;
-	}
-
-	// TODO: const
-	write_vals(addys, vals, num_vals_to_send);
-
-	// put the old reg vals back just in case
-	for (i=0; i < num_vals_to_send; i++){
-		addys -= RW_REG_OFFSET;
-	}
-
-}
-
-
 struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 {
 	int have_state_request = 0;
@@ -105,7 +87,7 @@ struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 	memset(&response, 0, sizeof(struct StateResponse));
 	
 	if(size < sizeof(struct Packet)) {
-		printk("Packet was too small!! Not processing.\n");
+		if(KOVAN_KMOD_WARN)printk("Packet was too small!! Not processing.\n");
 		return response; // Error: Packet is too small?
 	}
 	
@@ -161,7 +143,7 @@ void do_work(struct work_struct *data)
 		struct StateResponse response = do_packet(skb->data + UDP_HEADER_SIZE, skb->len - UDP_HEADER_SIZE);
 		
 		if(!response.hasState) {
-			printk("No State to send back. Continuing...\n");
+			if(KOVAN_KMOD_WARN)printk("No State to send back. Continuing...\n");
 			continue;
 		}
 		if(KOVAN_KMOD_DEBUG) printk("Sending State Back...\n");

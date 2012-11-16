@@ -36,7 +36,7 @@ public:
 	
 	Command createWriteCommand(unsigned short address, unsigned short value);
 
-	void turnMotorsOn(unsigned short speed = 0xFFFF);
+	void turnMotorsOn(unsigned short speedPercent = 100);
 
 	void turnMotorsOff();
 
@@ -44,7 +44,9 @@ public:
 
 	void displayState(const State state);
 
+	unsigned short getADC(unsigned short channel);
 
+	void speedTest();
 
 private:
 	int m_sock;
@@ -175,12 +177,17 @@ Command KovanModule::createWriteCommand(unsigned short address, unsigned short v
 // pwm_div is probably constant
 //
 // pwm_val depends on the speed  (shared for all motors currently)
-// 0xFF seems to be relatively quick
+//
+//  set speedPercent 0-100
 //
 // drive_code specifies  forward/reverse/idle/brake
 // Forward = 10, Reverse = 01, Brake = 11, Idle = 00
-void KovanModule::turnMotorsOn(unsigned short speed)
+void KovanModule::turnMotorsOn(unsigned short speedPercent)
 {
+
+	if (speedPercent > 100) speedPercent = 100;
+
+	unsigned short speed = (speedPercent*4095) / 100;
 
 	// this seems to be the pwm div bunnie uses (10kHz?)
 	Command c0 = createWriteCommand(MOTOR_PWM_PERIOD_T, 3);
@@ -196,7 +203,20 @@ void KovanModule::turnMotorsOn(unsigned short speed)
 	commands.push_back(c1);
 	commands.push_back(c2);
 
+	// annoying  that we have to do this
+	Command r0;
+	r0.type = StateCommandType;
+	commands.push_back(r0);
+
+
 	send(commands);
+	State state;
+
+	// shouldn't need this
+	if(!recv(state)) {
+		std::cout << "Error: didn't get state back!" << std::endl;
+		return;
+	}
 }
 
 void KovanModule::turnMotorsOff()
@@ -216,8 +236,19 @@ void KovanModule::turnMotorsOff()
 	commands.push_back(c1);
 	commands.push_back(c2);
 
-	send(commands);
+	// annoying  that we have to do this
+	Command r0;
+	r0.type = StateCommandType;
+	commands.push_back(r0);
 
+	send(commands);
+	State state;
+
+	// shouldn't need this
+	if(!recv(state)) {
+		std::cout << "Error: didn't get state back!" << std::endl;
+		return;
+	}
 }
 
 int KovanModule::getState(State &state)
@@ -238,6 +269,87 @@ int KovanModule::getState(State &state)
 	}
 
 	return 0;
+}
+
+
+// channel 0-15
+unsigned short KovanModule::getADC(unsigned short channel)
+{
+
+	unsigned short adc_val = 0xFFFF;
+
+
+	// Write adc_chan without go_bit
+	Command w0 = createWriteCommand(ADC_GO_T,0);
+	Command w1 = createWriteCommand(ADC_CHAN_T, channel);
+
+	// write go bit high
+	Command w2 = createWriteCommand(ADC_GO_T,1);
+
+	// write go bit low
+	Command w3 = createWriteCommand(ADC_GO_T,0);
+
+	CommandVector writeCommands;
+	writeCommands.push_back(w0);
+	writeCommands.push_back(w1);
+	writeCommands.push_back(w2);
+	writeCommands.push_back(w3);
+
+
+	// annoying  that we have to do this
+	Command r0;
+	r0.type = StateCommandType;
+	writeCommands.push_back(r0);
+
+
+
+	for(int i = 0; i < 2; i++){
+		State state;
+
+		send(writeCommands);
+
+		// shouldn't need this
+		if(!recv(state)) {
+			std::cout << "Error: didn't get state back!" << std::endl;
+			return -1;
+		}
+
+		// Wait for ready
+		do{
+			getState(state);
+		}while(!state.t[ADC_VALID_T]);
+
+		// Read raw voltage
+		adc_val = state.t[ADC_IN_T];
+	}
+
+	return adc_val;
+}
+
+
+void KovanModule::speedTest()
+{
+
+
+	Command c0;
+	c0.type = StateCommandType;
+
+	Command c1 = createWriteCommand(MOTOR_PWM_PERIOD_T, 3);
+
+
+	CommandVector commands;
+	commands.push_back(c0);
+	commands.push_back(c1);
+
+	State state;
+	for (int i = 0; i < 1000; i++){
+
+		send(commands);
+		if(!recv(state)) {
+			std::cout << "Error: didn't get state back!" << std::endl;
+			return;
+		}
+	}
 }
 
 
@@ -270,18 +382,33 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	
+
 	// Turn motors on for some time
+	std::cout << "Motors on..." << std::endl;
 	kovan.turnMotorsOn();
 	sleep(3);
 
+
 	// Turn the motors off
+	std::cout << "Motors off..." << std::endl;
 	kovan.turnMotorsOff();
 	sleep(1);
+
+
+	// check ADCs
+	std::cout << std::endl;
+	for(int i = 0; i< 16; i++){
+		std::cout << "ADC[" << i << "] = " << kovan.getADC(i) << std::endl;
+	}
+	std::cout << std::endl;
+
 
 	// Update and display the state
 	State state;
 	kovan.getState(state);
 	kovan.displayState(state);
 
+
+	//kovan.speedTest();
 	return 0;
 }
