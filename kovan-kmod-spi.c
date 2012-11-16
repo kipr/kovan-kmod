@@ -256,11 +256,10 @@ void read_vals(unsigned short *buff_rx, unsigned short num_vals_to_read)
 	}
 }
 
-//FIXME: constants
 void write_vals(unsigned short *addys, unsigned short *vals, unsigned short num_vals_to_send)
 {
 	unsigned short i;
-	unsigned short buff_rx_tmp[40]; // 40 command registers
+	unsigned short buff_rx_tmp[NUM_RW_REGS]; // 40 command registers
 	unsigned int ssp3_val = 0;
 
 	//make sure we get back to a waiting state
@@ -287,16 +286,15 @@ void write_vals(unsigned short *addys, unsigned short *vals, unsigned short num_
 
 
 //  can write to registers 24-63
-//FIXME: constants
 void write_test(void)
 {
 	unsigned short i;
-	unsigned short first_reg = 24;
-	unsigned short last_reg = 63;
+	unsigned short first_reg = RW_REG_OFFSET;
+	unsigned short last_reg = NUM_FPGA_REGS-1;
 
-	unsigned short num_vals_to_send = 40;
-	unsigned short vals[40]; // 40 command registers
-	unsigned short addys[40]; // 40 command registers
+	unsigned short num_vals_to_send = NUM_RW_REGS;
+	unsigned short vals[NUM_RW_REGS]; // 40 command registers
+	unsigned short addys[NUM_RW_REGS]; // 40 command registers
 
 	unsigned int addy_cnt = 0;
 
@@ -310,12 +308,11 @@ void write_test(void)
 }
 
 
-//FIXME: constants
 void spi_test(void)
 {
 
-	const static short num_regs = 64; // NUM_FPGA_REGS
-	unsigned short rx_buff[64];
+	int num_regs = NUM_RW_REGS;
+	unsigned short rx_buff[NUM_FPGA_REGS];
 
 	// check spi config
 	print_spi_regs();

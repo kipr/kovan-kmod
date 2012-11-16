@@ -8,8 +8,8 @@
 #ifndef KOVAN_KMOD_SPI_H_
 #define KOVAN_KMOD_SPI_H_
 
-#define NUM_FPGA_REGS 64
-#define NUM_RW_REGS 40
+#define NUM_FPGA_REGS 43
+#define NUM_RW_REGS 19
 #define RO_REG_OFFSET 0
 #define RW_REG_OFFSET 24
 

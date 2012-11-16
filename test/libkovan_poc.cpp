@@ -11,6 +11,8 @@
 #include <iostream>
 #include <unistd.h>
 #include "../protocol.h"
+#include "../kovan-regs.h"
+
 
 typedef std::vector<Command> CommandVector;
 
@@ -32,6 +34,18 @@ public:
 	
 	bool recv(State& state);
 	
+	Command createWriteCommand(unsigned short address, unsigned short value);
+
+	void turnMotorsOn(unsigned short speed = 0xFFFF);
+
+	void turnMotorsOff();
+
+	int getState(State &state);
+
+	void displayState(const State state);
+
+
+
 private:
 	int m_sock;
 	sockaddr_in m_out;
@@ -142,6 +156,105 @@ Packet *KovanModule::createPacket(const uint16_t& num, uint32_t& packet_size)
 	return packet;
 }
 
+
+Command KovanModule::createWriteCommand(unsigned short address, unsigned short value)
+{
+		WriteCommand wc;
+		wc.addy = address;
+		wc.val = value;
+		Command c0;
+		c0.type = WriteCommandType;
+		memcpy(c0.data, &wc, sizeof(WriteCommand));
+
+		return c0;
+}
+
+
+// test to turn all 4 motors on
+//
+// pwm_div is probably constant
+//
+// pwm_val depends on the speed  (shared for all motors currently)
+// 0xFF seems to be relatively quick
+//
+// drive_code specifies  forward/reverse/idle/brake
+void KovanModule::turnMotorsOn(unsigned short speed)
+{
+
+	// this seems to be the pwm div bunnie uses (10kHz?)
+	Command c0 = createWriteCommand(MOTOR_PWM_PERIOD_T, 3);
+
+	// relatively fast
+	Command c1 = createWriteCommand(MOTOR_PWM_T, speed);
+
+	// drive code (all forward)
+	Command c2 = createWriteCommand(MOTOR_DRIVE_CODE_T, 0xAA);
+
+	CommandVector commands;
+	commands.push_back(c0);
+	commands.push_back(c1);
+	commands.push_back(c2);
+
+	send(commands);
+}
+
+void KovanModule::turnMotorsOff()
+{
+
+	// this seems to be the pwm div bunnie uses (10kHz?)
+	Command c0 = createWriteCommand(MOTOR_PWM_PERIOD_T, 3);
+
+	// relatively fast
+	Command c1 = createWriteCommand(MOTOR_PWM_T, 0);
+
+	// drive code (F,R,F,R)
+	Command c2 = createWriteCommand(MOTOR_DRIVE_CODE_T, 0);
+
+	CommandVector commands;
+	commands.push_back(c0);
+	commands.push_back(c1);
+	commands.push_back(c2);
+
+	send(commands);
+
+}
+
+int KovanModule::getState(State &state)
+{
+
+	Command c0;
+	c0.type = StateCommandType;
+
+	CommandVector commands;
+	commands.push_back(c0);
+
+	send(commands);
+
+
+	if(!recv(state)) {
+		std::cout << "Error: didn't get state back!" << std::endl;
+		return -1;
+	}
+
+	return 0;
+}
+
+
+void KovanModule::displayState(const State state)
+{
+
+	int i;
+	std::cout << "State: " << std::endl;
+	for (i = 0; i < NUM_FPGA_REGS; i+=4){
+		std::cout << "\t"
+				<< state.t[i]   << ", "
+				<< state.t[i+1] << ", "
+				<< state.t[i+2] << ", "
+				<< state.t[i+3] << std::endl;
+	}
+}
+
+
 int main(int argc, char *argv[])
 {
 	KovanModule kovan(inet_addr("127.0.0.1"), htons(5555));
@@ -156,36 +269,18 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	
-	WriteCommand test;
-	test.addy = 3;
-	test.val = 100;
-	Command command;
-	command.type = WriteCommandType;
-	memcpy(command.data, &test, sizeof(WriteCommand));
-	
-	Command command1;
-	command1.type = StateCommandType;
-	
-	CommandVector commands;
-	commands.push_back(command);
-	commands.push_back(command1);
-	
-	kovan.send(commands);
-	
+	// Turn motors on for some time
+	kovan.turnMotorsOn();
+	sleep(3);
+
+	// Turn the motors off
+	kovan.turnMotorsOff();
+	sleep(1);
+
+	// Update and display the state
 	State state;
-	if(!kovan.recv(state)) {
-		return 1;
-	}
-	
-	int i;
-	std::cout << "State: " << std::endl;
-	for (i = 0; i < NUM_FPGA_REGS; i+=4){
-		std::cout << "\t"
-				<< state.t[i]   << ", "
-				<< state.t[i+1] << ", "
-				<< state.t[i+2] << ", "
-				<< state.t[i+3] << std::endl;
-	}
+	kovan.getState(state);
+	kovan.displayState(state);
 
 	return 0;
 }

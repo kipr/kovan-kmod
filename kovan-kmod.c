@@ -26,7 +26,9 @@
 
 #define SERVER_PORT 5555
 
-#define WRITE_COMMAND_BUFF_SIZE 64
+#define WRITE_COMMAND_BUFF_SIZE NUM_RW_REGS
+
+#define KOVAN_KMOD_DEBUG 1
 
 static struct socket *udpsocket = NULL;
 static struct socket *clientsocket = NULL;
@@ -50,7 +52,7 @@ struct workqueue_struct *wq;
 
 void cb_data(struct sock *sk, int bytes)
 {
-	printk("Message Received\n");
+	//printk("Message Received\n");
 
 	wq_data.sk = sk;
 	queue_work(wq, &wq_data.worker);
@@ -65,7 +67,7 @@ struct StateResponse state()
 	struct StateResponse response;
 	response.hasState = 1;
 	response.state = ret;
-	printk("State called\n");
+	//printk("State called\n");
 	return response;
 }
 
@@ -96,8 +98,8 @@ struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 	int have_state_request = 0;
 
 	int num_write_commands = 0;
-	unsigned short write_addys[WRITE_COMMAND_BUFF_SIZE];
-	unsigned short write_vals[WRITE_COMMAND_BUFF_SIZE];
+	unsigned short write_addresses[WRITE_COMMAND_BUFF_SIZE];
+	unsigned short write_values[WRITE_COMMAND_BUFF_SIZE];
 
 	struct StateResponse response;
 	memset(&response, 0, sizeof(struct StateResponse));
@@ -109,7 +111,7 @@ struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 	
 	struct Packet *packet = (struct Packet *)data;
 	
-	printk("Received %u commands\n", packet->num);
+	if(KOVAN_KMOD_DEBUG) printk("Received %u commands\n", packet->num);
 	
 	for(unsigned short i = 0; i < packet->num; ++i) {
 		struct Command cmd = packet->commands[i];
@@ -122,9 +124,10 @@ struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 		case WriteCommandType:
 			if (num_write_commands < WRITE_COMMAND_BUFF_SIZE){
 				struct WriteCommand *w_cmd = (struct WriteCommand*) &(cmd.data);
-				write_addys[num_write_commands] = 	w_cmd->addy;
-				write_vals[num_write_commands] = 	w_cmd->val;
-				if (write_addys[num_write_commands] < NUM_RW_REGS){
+				write_addresses[num_write_commands] = 	w_cmd->addy;
+				write_values[num_write_commands] = 	w_cmd->val;
+				if(KOVAN_KMOD_DEBUG) printk("r[%d]<=%d\n",w_cmd->addy, w_cmd->val);
+				if (write_addresses[num_write_commands] < NUM_FPGA_REGS){
 					num_write_commands += 1;
 				} // otherwise ignore this out of range request
 			}// no more room for write commands
@@ -135,7 +138,7 @@ struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 	}
 	
 	if (num_write_commands > 0){
-		write_vals_auto_offset(write_addys, write_vals, num_write_commands);
+		write_vals(write_addresses, write_values, num_write_commands);
 	}
 
 	if (have_state_request){
@@ -154,21 +157,21 @@ void do_work(struct work_struct *data)
 	int len = 0;
 	while((len = skb_queue_len(&foo->sk->sk_receive_queue)) > 0) {
 		struct sk_buff *skb = skb_dequeue(&foo->sk->sk_receive_queue);
-		printk("Message : %i Message: %s\n", skb->len - UDP_HEADER_SIZE, skb->data + UDP_HEADER_SIZE);
+		if(KOVAN_KMOD_DEBUG) printk("Message : %i Message: %s\n", skb->len - UDP_HEADER_SIZE, skb->data + UDP_HEADER_SIZE);
 		struct StateResponse response = do_packet(skb->data + UDP_HEADER_SIZE, skb->len - UDP_HEADER_SIZE);
 		
 		if(!response.hasState) {
 			printk("No State to send back. Continuing...\n");
 			continue;
 		}
-		printk("Sending State Back...\n");
+		if(KOVAN_KMOD_DEBUG) printk("Sending State Back...\n");
 		
 		struct sockaddr_in to;
 		memset(&to, 0, sizeof(to));
 		to.sin_family = AF_INET;
 		struct iphdr *ipinf = (struct iphdr *)skb_network_header(skb);
 		to.sin_addr.s_addr = ipinf->saddr;
-		printk(" @_SRC: %d.%d.%d.%d\n",NIPQUAD(ipinf->saddr));
+		if(KOVAN_KMOD_DEBUG) printk(" @_SRC: %d.%d.%d.%d\n",NIPQUAD(ipinf->saddr));
 		to.sin_port = *((unsigned short *)skb->data);
 		
 		struct msghdr msg;
@@ -187,12 +190,12 @@ void do_work(struct work_struct *data)
 		/* adjust memory boundaries */
  		mm_segment_t oldfs = get_fs();
 		set_fs(KERNEL_DS);
-		printk("sock_sendmsg\n");
+		//printk("sock_sendmsg\n");
 		sock_sendmsg(clientsocket, &msg, iov.iov_len);
 		
 		set_fs(oldfs);
 		kfree_skb(skb);
-		printk("Sent State Response\n");
+		//printk("Sent State Response\n");
 	}
 }
 
