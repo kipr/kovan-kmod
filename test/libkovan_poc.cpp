@@ -178,6 +178,7 @@ Command KovanModule::createWriteCommand(unsigned short address, unsigned short v
 // 0xFF seems to be relatively quick
 //
 // drive_code specifies  forward/reverse/idle/brake
+// Forward = 10, Reverse = 01, Brake = 11, Idle = 00
 void KovanModule::turnMotorsOn(unsigned short speed)
 {
 
