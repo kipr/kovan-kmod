@@ -14,6 +14,18 @@
 #include "../kovan-regs.h"
 
 
+// Servos
+#define TIMEDIV (1.0 / 13000000) // 13 MHz clock
+#define PWM_PERIOD_RAW 0.02F
+#define SERVO_MAX_RAW 0.002f
+#define SERVO_MIN_RAW 0.001f
+#define PWM_PERIOD ((unsigned int)(PWM_PERIOD_RAW / TIMEDIV))
+#define SERVO_MAX (SERVO_MAX_RAW / TIMEDIV)
+#define SERVO_MIN (SERVO_MIN_RAW / TIMEDIV)
+
+
+
+
 typedef std::vector<Command> CommandVector;
 
 class KovanModule
@@ -39,6 +51,8 @@ public:
 	void turnMotorsOn(unsigned short speedPercent = 100);
 
 	void turnMotorsOff();
+
+	void moveServo(const char &servoNum, const unsigned short &position);
 
 	int getState(State &state);
 
@@ -326,6 +340,60 @@ unsigned short KovanModule::getADC(unsigned short channel)
 	return adc_val;
 }
 
+void KovanModule::moveServo(const char &servoNum, const unsigned short &position)
+{
+
+	unsigned short val = (unsigned int)(((SERVO_MAX - SERVO_MIN) * (position / 1024.0)) + SERVO_MIN) >> 8;
+
+	// we are only writing to the upper 16 bits of the 24 bit register .....
+
+
+	unsigned short addy = 0;
+
+	switch(servoNum){
+	case 0:
+		addy = SERVO_COMMAND_0;
+		break;
+	case 1:
+		addy = SERVO_COMMAND_1;
+		break;
+	case 2:
+		addy = SERVO_COMMAND_2;
+		break;
+	case 3:
+		addy = SERVO_COMMAND_3;
+		break;
+	default:
+		std::cout << "Invalid servo number" << std::endl;
+		return;
+	}
+
+
+	Command c0;
+	c0.type = StateCommandType;
+
+	// servo position (pwm)
+	Command c1 = createWriteCommand(addy, val);
+
+	// Servo PWM period only has to be set once
+	// value is computed as  0x03F7A0
+	// but we only have access to upper 16 bits
+	Command c2 = createWriteCommand(SERVO_PWM_PERIOD_T, 0x03F7);
+
+	CommandVector commands;
+	commands.push_back(c0);
+	commands.push_back(c1);
+	commands.push_back(c2);
+
+	State state;
+
+	send(commands);
+	if(!recv(state)) {
+		std::cout << "Error: didn't get state back!" << std::endl;
+		return;
+	}
+}
+
 
 void KovanModule::speedTest()
 {
@@ -403,10 +471,21 @@ int main(int argc, char *argv[])
 	std::cout << std::endl;
 
 
+	// Move Servo 0
+	int servo = 0;
+	std::cout << "Moving Servo " << servo <<"..." << std::endl;
+	for (int i = 200; i < 700; i+=100){
+		kovan.moveServo(servo, i);
+		usleep(100000);
+	}
+	std::cout<<std::endl;
+
+
 	// Update and display the state
 	State state;
 	kovan.getState(state);
 	kovan.displayState(state);
+
 
 
 	//kovan.speedTest();
