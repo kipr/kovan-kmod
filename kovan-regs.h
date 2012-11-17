@@ -34,7 +34,7 @@
 #define SERVO_COMMAND_1			26
 #define SERVO_COMMAND_2			27
 #define SERVO_COMMAND_3			28
-#define DIG_DIRS				29	// Do we need it???
+#define DIG_OUT					29
 #define DIG_PULLUPS				30
 #define	DIG_OUT_ENABLE			31
 #define AN_PULLUPS				32

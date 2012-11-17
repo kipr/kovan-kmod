@@ -46,19 +46,23 @@ public:
 	
 	bool recv(State& state);
 	
-	Command createWriteCommand(unsigned short address, unsigned short value);
+	Command createWriteCommand(const unsigned short &address, const unsigned short &value);
+	int  singleWrite(const unsigned short &address, const unsigned short &value);
 
-	void turnMotorsOn(unsigned short speedPercent = 100);
 
+	unsigned char readDigitals();
+	void writeDigitals(const unsigned char &values, const unsigned char &pullups, const unsigned char &outputEnables);
+
+	void turnMotorsOn(const unsigned short &speedPercent);
 	void turnMotorsOff();
 
 	void moveServo(const char &servoNum, const unsigned short &position);
 
 	int getState(State &state);
+	void displayState(const State &state);
 
-	void displayState(const State state);
-
-	unsigned short getADC(unsigned short channel);
+	unsigned short getADC(const unsigned short &channel);
+	void setADCPullups(const unsigned char &pullups);
 
 	void speedTest();
 
@@ -173,7 +177,7 @@ Packet *KovanModule::createPacket(const uint16_t& num, uint32_t& packet_size)
 }
 
 
-Command KovanModule::createWriteCommand(unsigned short address, unsigned short value)
+Command KovanModule::createWriteCommand(const unsigned short &address, const unsigned short &value)
 {
 		WriteCommand wc;
 		wc.addy = address;
@@ -196,12 +200,15 @@ Command KovanModule::createWriteCommand(unsigned short address, unsigned short v
 //
 // drive_code specifies  forward/reverse/idle/brake
 // Forward = 10, Reverse = 01, Brake = 11, Idle = 00
-void KovanModule::turnMotorsOn(unsigned short speedPercent)
+void KovanModule::turnMotorsOn(const unsigned short &speedPercent)
 {
+	unsigned short speed = 0;
 
-	if (speedPercent > 100) speedPercent = 100;
-
-	unsigned short speed = (speedPercent*4095) / 100;
+	if (speedPercent > 100){
+		speed = 4095;
+	}else{
+		speed = (speedPercent*4095) / 100;
+	}
 
 	// this seems to be the pwm div bunnie uses (10kHz?)
 	Command c0 = createWriteCommand(MOTOR_PWM_PERIOD_T, 3);
@@ -286,8 +293,85 @@ int KovanModule::getState(State &state)
 }
 
 
+unsigned char KovanModule::readDigitals()
+{
+
+	std::cout<<"Warning: readDigitals has not been tested." << std::endl; // TODO
+
+	State state;
+	getState(state);
+
+	unsigned char pinVals = 0;
+	pinVals = (state.t[DIG_OUT] & state.t[DIG_OUT_ENABLE]);
+	pinVals |= (state.t[DIG_IN] & ~state.t[DIG_OUT_ENABLE]);
+
+	return pinVals;
+}
+
+
+int  KovanModule::singleWrite(const unsigned short &address, const unsigned short &value)
+{
+
+	Command c0 = createWriteCommand(address, value);
+
+	CommandVector commands;
+	commands.push_back(c0);
+
+	// annoying  that we have to do this
+	Command r0;
+	r0.type = StateCommandType;
+	commands.push_back(r0);
+
+	State state;
+
+	// shouldn't need this
+	if(!recv(state)) {
+		std::cout << "Error: didn't get state back!" << std::endl;
+		return -1;
+	}
+
+	return 0;
+}
+
+
+// this version just replaces everything
+void KovanModule::writeDigitals(const unsigned char &values, const unsigned char &pullups, const unsigned char &outputEnables)
+{
+
+	std::cout<<"Warning: writeDigitals has not been tested." << std::endl; // TODO
+
+	Command c0 = createWriteCommand(DIG_OUT, values);
+	Command c1 = createWriteCommand(DIG_OUT_ENABLE, outputEnables);
+	Command c2 = createWriteCommand(DIG_PULLUPS, pullups);
+
+	CommandVector commands;
+	commands.push_back(c0);
+	commands.push_back(c1);
+	commands.push_back(c2);
+
+	// annoying  that we have to do this
+	Command r0;
+	r0.type = StateCommandType;
+	commands.push_back(r0);
+
+	send(commands);
+	State state;
+
+	// shouldn't need this
+	if(!recv(state)) {
+		std::cout << "Error: didn't get state back!" << std::endl;
+		return;
+	}
+
+	singleWrite(DIG_UPDATE_T, 1);
+	singleWrite(DIG_UPDATE_T, 0);
+	singleWrite(DIG_SAMPLE_T, 0); // FPGA captures new dig values
+	singleWrite(DIG_SAMPLE_T, 1);
+}
+
+
 // channel 0-15
-unsigned short KovanModule::getADC(unsigned short channel)
+unsigned short KovanModule::getADC(const unsigned short &channel)
 {
 
 	unsigned short adc_val = 0xFFFF;
@@ -339,6 +423,16 @@ unsigned short KovanModule::getADC(unsigned short channel)
 
 	return adc_val;
 }
+
+
+
+void KovanModule::setADCPullups(const unsigned char &pullups)
+{
+	std::cout<<"Warning: setADCPullups has not been tested." << std::endl; // TODO
+	singleWrite(AN_PULLUPS, pullups);
+}
+
+
 
 void KovanModule::moveServo(const char &servoNum, const unsigned short &position)
 {
@@ -421,7 +515,7 @@ void KovanModule::speedTest()
 }
 
 
-void KovanModule::displayState(const State state)
+void KovanModule::displayState(const State &state)
 {
 
 	int i;
@@ -453,7 +547,7 @@ int main(int argc, char *argv[])
 
 	// Turn motors on for some time
 	std::cout << "Motors on..." << std::endl;
-	kovan.turnMotorsOn();
+	kovan.turnMotorsOn(100);
 	sleep(3);
 
 
