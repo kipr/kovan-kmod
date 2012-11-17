@@ -205,24 +205,26 @@ void KovanModule::turnMotorsOn(const unsigned short &speedPercent)
 	unsigned short speed = 0;
 
 	if (speedPercent > 100){
-		speed = 4095;
+		speed = 2600;
 	}else{
-		speed = (speedPercent*4095) / 100;
+		speed = (speedPercent*2600) / 100;
 	}
 
-	// this seems to be the pwm div bunnie uses (10kHz?)
-	Command c0 = createWriteCommand(MOTOR_PWM_PERIOD_T, 3);
 
-	// relatively fast
-	Command c1 = createWriteCommand(MOTOR_PWM_T, speed);
+	Command c0 = createWriteCommand(MOTOR_PWM_0, speed);
+	Command c1 = createWriteCommand(MOTOR_PWM_1, speed);
+	Command c2 = createWriteCommand(MOTOR_PWM_2, speed);
+	Command c3 = createWriteCommand(MOTOR_PWM_3, speed);
 
 	// drive code (all forward)
-	Command c2 = createWriteCommand(MOTOR_DRIVE_CODE_T, 0xAA);
+	Command c4 = createWriteCommand(MOTOR_DRIVE_CODE_T, 0xAA);
 
 	CommandVector commands;
 	commands.push_back(c0);
 	commands.push_back(c1);
 	commands.push_back(c2);
+	commands.push_back(c3);
+	commands.push_back(c4);
 
 	// annoying  that we have to do this
 	Command r0;
@@ -243,19 +245,21 @@ void KovanModule::turnMotorsOn(const unsigned short &speedPercent)
 void KovanModule::turnMotorsOff()
 {
 
-	// this seems to be the pwm div bunnie uses (10kHz?)
-	Command c0 = createWriteCommand(MOTOR_PWM_PERIOD_T, 3);
+	// speed 0
+	Command c0 = createWriteCommand(MOTOR_PWM_0, 0);
+	Command c1 = createWriteCommand(MOTOR_PWM_1, 0);
+	Command c2 = createWriteCommand(MOTOR_PWM_2, 0);
+	Command c3 = createWriteCommand(MOTOR_PWM_3, 0);
 
-	// relatively fast
-	Command c1 = createWriteCommand(MOTOR_PWM_T, 0);
-
-	// drive code (F,R,F,R)
-	Command c2 = createWriteCommand(MOTOR_DRIVE_CODE_T, 0);
+	// passive brake
+	Command c4 = createWriteCommand(MOTOR_DRIVE_CODE_T, 0);
 
 	CommandVector commands;
 	commands.push_back(c0);
 	commands.push_back(c1);
 	commands.push_back(c2);
+	commands.push_back(c3);
+	commands.push_back(c4);
 
 	// annoying  that we have to do this
 	Command r0;
@@ -472,12 +476,11 @@ void KovanModule::moveServo(const char &servoNum, const unsigned short &position
 	// Servo PWM period only has to be set once
 	// value is computed as  0x03F7A0
 	// but we only have access to upper 16 bits
-	Command c2 = createWriteCommand(SERVO_PWM_PERIOD_T, 0x03F7);
+	//Command c2 = createWriteCommand(SERVO_PWM_PERIOD_T, 0x03F7);
 
 	CommandVector commands;
 	commands.push_back(c0);
 	commands.push_back(c1);
-	commands.push_back(c2);
 
 	State state;
 
@@ -496,7 +499,7 @@ void KovanModule::speedTest()
 	Command c0;
 	c0.type = StateCommandType;
 
-	Command c1 = createWriteCommand(MOTOR_PWM_PERIOD_T, 3);
+	Command c1 = createWriteCommand(MOTOR_PWM_0, 3);
 
 
 	CommandVector commands;

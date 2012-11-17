@@ -38,10 +38,10 @@
 #define DIG_PULLUPS				30
 #define	DIG_OUT_ENABLE			31
 #define AN_PULLUPS				32
-#define MOTOR_PWM_0				33	// Not currently supported
-#define MOTOR_PWM_1				34	// Not currently supported
-#define MOTOR_PWM_2				35	// Not currently supported
-#define MOTOR_PWM_3				36	// Not currently supported
+#define MOTOR_PWM_0				33
+#define MOTOR_PWM_1				34
+#define MOTOR_PWM_2				35
+#define MOTOR_PWM_3				36
 
 
 // Temporary Ready Only
@@ -52,9 +52,6 @@
 
 
 // Temporary Read/Write
-#define MOTOR_PWM_T 			33
-#define SERVO_PWM_PERIOD_T		34
-#define MOTOR_PWM_PERIOD_T		35
 #define DIG_SAMPLE_T			37
 #define	DIG_UPDATE_T			38
 #define MOTOR_DRIVE_CODE_T		39
