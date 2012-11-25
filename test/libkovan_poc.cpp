@@ -326,6 +326,7 @@ int  KovanModule::singleWrite(const unsigned short &address, const unsigned shor
 	r0.type = StateCommandType;
 	commands.push_back(r0);
 
+	send(commands);
 	State state;
 
 	// shouldn't need this
@@ -517,15 +518,14 @@ int main(int argc, char *argv[])
 
 
 	// check ADCs
-	//std::cout << std::endl;
-	//for(int i = 0; i< 17; i++){
-	//	std::cout << "ADC[" << i << "] = " << kovan.getADC(i) << std::endl;
-	//}
-	//std::cout << std::endl;
+	std::cout << std::endl;
+	for(int i = 0; i< 17; i++){
+		std::cout << "ADC[" << i << "] = " << kovan.getADC(i) << std::endl;
+	}
+	std::cout << std::endl;
 
 
 	// Move Servo 0
-
 	int servo = 0;
 	std::cout << "Moving Servo " << servo <<"..." << std::endl;
 	for (int i = 200; i < 700; i+=100){
@@ -533,6 +533,23 @@ int main(int argc, char *argv[])
 		usleep(100000);
 	}
 	std::cout<<std::endl;
+
+
+	// Read digital values
+	unsigned char digitals = kovan.readDigitals();
+	std::cout << "Digitals: " << digitals << std::endl;
+
+
+	// Write all ports high, pullups active, output enable
+	std::cout << "Writing all digital ports high..." << std::endl;
+	kovan.writeDigitals(0xFF, 0xFF, 0xFF);
+	usleep(500000);
+
+
+	// Write all ports low, pullups active, output enable
+	std::cout << "Writing all digital ports low..." << std::endl;
+	kovan.writeDigitals(0x00, 0xFF, 0xFF);
+	usleep(500000);
 
 
 	// Update and display the state
