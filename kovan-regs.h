@@ -11,22 +11,24 @@
 
 // Permanent Read Only
 #define DIG_IN 					1
-#define AN_IN_0 				2	// Not currently supported
-#define AN_IN_1 				3	// Not currently supported
-#define AN_IN_2 				4	// Not currently supported
-#define AN_IN_3 				5	// Not currently supported
-#define AN_IN_4 				6	// Not currently supported
-#define AN_IN_5 				7	// Not currently supported
-#define AN_IN_6 				8	// Not currently supported
-#define AN_IN_7 				9	// Not currently supported
-#define AN_IN_8 				10	// Not currently supported
-#define AN_IN_9 				11	// Not currently supported
-#define AN_IN_10 				12	// Not currently supported
-#define AN_IN_11 				13	// Not currently supported
-#define AN_IN_12 				14	// Not currently supported
-#define AN_IN_13 				15	// Not currently supported
-#define AN_IN_14 				16	// Not currently supported
-#define AN_IN_15 				17	// Not currently supported
+#define AN_IN_0 				2	// User ADC 0
+#define AN_IN_1 				3	// User ADC 1
+#define AN_IN_2 				4	// User ADC 2
+#define AN_IN_3 				5	// User ADC 3
+#define AN_IN_4 				6	// User ADC 4
+#define AN_IN_5 				7	// User ADC 5
+#define AN_IN_6 				8	// User ADC 6
+#define AN_IN_7 				9	// User ADC 7
+#define AN_IN_8 				10	// Motor ADC 0
+#define AN_IN_9 				11	// Motor ADC 1
+#define AN_IN_10 				12	// Motor ADC 2
+#define AN_IN_11 				13	// Motor ADC 3
+#define AN_IN_12 				14	// Motor ADC 4
+#define AN_IN_13 				15	// Motor ADC 5
+#define AN_IN_14 				16	// Motor ADC 6
+#define AN_IN_15 				17	// Motor ADC 7
+#define AN_IN_16 				18	// Battery ADC
+
 
 
 // Permanent Read/Write
