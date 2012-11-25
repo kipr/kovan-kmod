@@ -561,14 +561,15 @@ int main(int argc, char *argv[])
 
 
 	// check ADCs
-	std::cout << std::endl;
-	for(int i = 0; i< 16; i++){
-		std::cout << "ADC[" << i << "] = " << kovan.getADC(i) << std::endl;
-	}
-	std::cout << std::endl;
+	//std::cout << std::endl;
+	//for(int i = 0; i< 17; i++){
+	//	std::cout << "ADC[" << i << "] = " << kovan.getADC(i) << std::endl;
+	//}
+	//std::cout << std::endl;
 
 
 	// Move Servo 0
+
 	int servo = 0;
 	std::cout << "Moving Servo " << servo <<"..." << std::endl;
 	for (int i = 200; i < 700; i+=100){

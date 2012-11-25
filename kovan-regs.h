@@ -45,8 +45,6 @@
 
 
 // Temporary Ready Only
-#define ADC_IN_T 				2
-#define ADC_VALID_T 			18
 #define DIG_VALID_T 			19
 #define DIG_BUSY_T 				20
 
@@ -56,8 +54,6 @@
 #define	DIG_UPDATE_T			38
 #define MOTOR_DRIVE_CODE_T		39
 #define MOTOR_ALL_STOP_T		40
-#define ADC_CHAN_T				41
-#define ADC_GO_T				42
 
 
 #endif /* KOVAN_REGS_H_ */
