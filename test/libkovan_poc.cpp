@@ -309,6 +309,12 @@ unsigned char KovanModule::readDigitals()
 	pinVals = (state.t[DIG_OUT] & state.t[DIG_OUT_ENABLE]);
 	pinVals |= (state.t[DIG_IN] & ~state.t[DIG_OUT_ENABLE]);
 
+	// TODO: putting these here until we know we don't need them
+	singleWrite(DIG_UPDATE_T, 1);
+	singleWrite(DIG_UPDATE_T, 0);
+	singleWrite(DIG_SAMPLE_T, 0); // FPGA captures new dig values
+	singleWrite(DIG_SAMPLE_T, 1);
+
 	return pinVals;
 }
 
@@ -334,6 +340,7 @@ int  KovanModule::singleWrite(const unsigned short &address, const unsigned shor
 		std::cout << "Error: didn't get state back!" << std::endl;
 		return -1;
 	}
+
 
 	return 0;
 }
@@ -535,7 +542,8 @@ int main(int argc, char *argv[])
 	std::cout<<std::endl;
 
 
-	// Read digital values
+	// Read digital values, pullups unactive, output disable
+	kovan.writeDigitals(0x00, 0x00, 0x00);
 	unsigned char digitals = kovan.readDigitals();
 	std::cout << "Digitals: " << digitals << std::endl;
 
@@ -548,7 +556,7 @@ int main(int argc, char *argv[])
 
 	// Write all ports low, pullups active, output enable
 	std::cout << "Writing all digital ports low..." << std::endl;
-	kovan.writeDigitals(0x00, 0xFF, 0xFF);
+	kovan.writeDigitals(0x00, 0x00, 0x00);
 	usleep(500000);
 
 
