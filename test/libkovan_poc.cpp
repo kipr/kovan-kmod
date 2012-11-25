@@ -374,58 +374,14 @@ void KovanModule::writeDigitals(const unsigned char &values, const unsigned char
 }
 
 
-// channel 0-15
+// channel 0-16
 unsigned short KovanModule::getADC(const unsigned short &channel)
 {
 
-	unsigned short adc_val = 0xFFFF;
+	State state;
+	getState(state);
 
-
-	// Write adc_chan without go_bit
-	Command w0 = createWriteCommand(ADC_GO_T,0);
-	Command w1 = createWriteCommand(ADC_CHAN_T, channel);
-
-	// write go bit high
-	Command w2 = createWriteCommand(ADC_GO_T,1);
-
-	// write go bit low
-	Command w3 = createWriteCommand(ADC_GO_T,0);
-
-	CommandVector writeCommands;
-	writeCommands.push_back(w0);
-	writeCommands.push_back(w1);
-	writeCommands.push_back(w2);
-	writeCommands.push_back(w3);
-
-
-	// annoying  that we have to do this
-	Command r0;
-	r0.type = StateCommandType;
-	writeCommands.push_back(r0);
-
-
-
-	for(int i = 0; i < 2; i++){
-		State state;
-
-		send(writeCommands);
-
-		// shouldn't need this
-		if(!recv(state)) {
-			std::cout << "Error: didn't get state back!" << std::endl;
-			return -1;
-		}
-
-		// Wait for ready
-		do{
-			getState(state);
-		}while(!state.t[ADC_VALID_T]);
-
-		// Read raw voltage
-		adc_val = state.t[ADC_IN_T];
-	}
-
-	return adc_val;
+	return state.t[AN_IN_0+channel];
 }
 
 
