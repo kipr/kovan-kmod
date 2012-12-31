@@ -396,8 +396,11 @@ unsigned short KovanModule::getADC(const unsigned short &channel)
 
 void KovanModule::setADCPullups(const unsigned char &pullups)
 {
-	std::cout<<"Warning: setADCPullups has not been tested." << std::endl; // TODO
 	singleWrite(AN_PULLUPS, pullups);
+        singleWrite(DIG_UPDATE_T, 1);                                              
+        singleWrite(DIG_UPDATE_T, 0);                              
+        singleWrite(DIG_SAMPLE_T, 0); // FPGA captures new dig values     
+        singleWrite(DIG_SAMPLE_T, 1);   
 }
 
 
@@ -523,6 +526,8 @@ int main(int argc, char *argv[])
 	kovan.turnMotorsOff();
 	sleep(1);
 
+	std::cout << "ADC pullups on" << std::endl;
+	kovan.setADCPullups(0xFF);  
 
 	// check ADCs
 	std::cout << std::endl;
