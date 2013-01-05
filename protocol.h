@@ -7,7 +7,8 @@ extern "C" {
 
 
 #define MAX_COMMAND_DATA_SIZE 16
-#define NUM_FPGA_REGS 43
+#define NUM_FPGA_REGS 48
+#define TOTAL_REGS 128
 
 enum CommandType
 {
@@ -28,6 +29,8 @@ struct Packet
 	struct Command commands[1];
 };
 
+
+
 struct WriteCommand
 {
 	unsigned short addy; // 0 - 40
@@ -36,8 +39,9 @@ struct WriteCommand
 
 struct State
 {
-	unsigned short t[NUM_FPGA_REGS];
+	unsigned short t[TOTAL_REGS];
 };
+
 
 #ifdef __cplusplus
 }

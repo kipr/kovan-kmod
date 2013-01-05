@@ -6,6 +6,7 @@
  */
 
 #include "kovan-kmod-spi.h"
+#include "protocol.h"
 
 #include <linux/kernel.h>	/* printk() */
 #include <linux/slab.h>		/* kmalloc() */

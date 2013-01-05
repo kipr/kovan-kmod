@@ -20,8 +20,10 @@
 #include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/timer.h>
 
 #include "kovan-kmod-spi.h"
+#include "kovan-regs.h"
 #include "protocol.h"
 
 #define SERVER_PORT 5555
@@ -33,13 +35,215 @@
 #define KOVAN_KMOD_ERROR 1
 
 
+static struct timer_list pid_timer;
+
+
 static struct socket *udpsocket = NULL;
 static struct socket *clientsocket = NULL;
+
+static unsigned short kovan_regs[TOTAL_REGS];
+
+//////
+
+#define MOVE_AT_SPEED 0
+#define MOVE_TO_POSITION 1
+#define MOVE_TO_POSITION_AT_SPEED 2
+
+
+#define DRIVE_CODE_BRAKE 0x3
+#define DRIVE_CODE_FORWARD 0x2
+#define DRIVE_CODE_REVERSE 0x1
+#define DRIVE_CODE_IDLE 0x0
+
+typedef struct {
+	int desired_position;
+	int desired_speed;
+
+	int position;
+	int position_prev;
+
+	int speed_prev;
+
+	int err_integr;
+
+	char mode;
+	char status;
+
+	short Kp_n;
+	short Kp_d;
+
+	short Ki_n;
+	short Ki_d;
+
+	short Kv_n;
+	short Kv_d;
+
+	short alpha; // out of 100
+
+	unsigned short pwm_out;
+	char drive_code;
+} pid_state;
+
+pid_state pid_states[4];
+
+void init_pid_state(pid_state *state){
+
+	state->Kp_n = 10;//90;
+	state->Ki_n = 0;//0;
+	state->Kv_n = -2;//-30;
+	state->Kp_d = 1;//10;
+	state->Ki_d = 5;//10;
+	state->Kv_d = 1;//10;
+
+	state->mode = 0;
+	state->status = 0;
+
+	state->desired_position = 0;
+	state->desired_speed = 0;
+
+	state->position = 0;
+	state->position_prev = 0;
+
+	state->speed_prev = 0;
+	state->err_integr = 0;
+
+	state->alpha = 50;
+
+	state->pwm_out = 0;
+	state->drive_code = 0;
+}
+
+void step_pid(pid_state *state){
+
+	//  printk("step_pid:\n");
+	static const int GOAL_EPSILON = 20;
+
+	static const short RESISTANCE = 400;
+	static const short MAX_PWM = 2600 - RESISTANCE;
+
+	static const int MAX_I_ERROR = 1000;
+	static const int MIN_I_ERROR = -MAX_I_ERROR;
+
+
+	int Pterm=0, Iterm=0, Dterm=0, PIDterm;
+
+
+	int pos_err = state->desired_position - state->position;
+	int speed_err = state->desired_speed - state->speed_prev; // TODO
+
+
+	int err = 0;
+	//if (state->mode != 0) state->mode = 0x1; // TODO: remove!
+
+	// Handle the different operating modes
+	switch(state->mode & 0x3){
+	case 0:
+		state->status = 0;
+		return;
+	case 1:
+		if ((pos_err > 0 && pos_err < GOAL_EPSILON) || (pos_err < 0 && pos_err > -GOAL_EPSILON)){
+			// at the goal
+			state->pwm_out = 0;
+			state->status = 0;
+			state->drive_code = DRIVE_CODE_BRAKE;
+			state->desired_speed = 0;
+			return;
+		}else{
+			err = pos_err;
+			state->status = 1;
+		}
+		break;
+	case 2:
+		state->status = 1;
+		err = speed_err;
+		break;
+	case 3:
+		if ((pos_err > 0 && pos_err < GOAL_EPSILON) || (pos_err < 0 && pos_err > -GOAL_EPSILON)){
+			// at the goal
+			state->pwm_out = 0;
+			state->status = 0;
+			state->drive_code = DRIVE_CODE_BRAKE;
+			return;
+		}else{
+			err = speed_err;
+			state->status = 1;
+		}
+		break;
+	}
+
+
+
+	// Proportional Term
+	////////////////////////////////////////////////////////////////////////////////
+	Pterm = (state->Kp_n * err)/state->Kp_d;
+
+	// Integral Term
+	////////////////////////////////////////////////////////////////////////////////
+	state->err_integr += err;
+	// is the error within the maximum or minimum motor power range?
+	if(state->err_integr > MAX_I_ERROR) state->err_integr = MAX_I_ERROR;
+	else if(state->err_integr < MIN_I_ERROR) state->err_integr = MIN_I_ERROR;
+
+	Iterm = (state->Ki_n * state->err_integr )/state->Ki_d;
+
+	// Derivative Term
+	////////////////////////////////////////////////////////////////////////////////
+	int filtered_speed = state->alpha*(state->position - state->position_prev) +  (100-state->alpha)*state->speed_prev;
+	filtered_speed = filtered_speed / 100;
+
+	Dterm = (state->Kv_n * (filtered_speed))/state->Kv_d;
+	state->position_prev = state->position;
+	state->speed_prev = filtered_speed;
+
+	PIDterm = Pterm + Iterm + Dterm;
+
+	// TODO: convert PIDterm to 2600
+	if (PIDterm > 0){
+
+		if (PIDterm > MAX_PWM){
+			state->pwm_out = MAX_PWM;
+		}else{
+			state->pwm_out = PIDterm;
+		}
+
+		state->drive_code = DRIVE_CODE_FORWARD;
+
+	}else{
+
+		if (PIDterm < -MAX_PWM){
+			state->pwm_out = MAX_PWM;
+		}else{
+			state->pwm_out = -PIDterm;
+		}
+
+		state->drive_code = DRIVE_CODE_REVERSE;
+	}
+
+
+	static const int DEADBAND = 20;
+	if (state->pwm_out < DEADBAND){
+		state->pwm_out = 0;
+	}else{
+		state->pwm_out += RESISTANCE;
+	}
+	if (state->mode > 0 && state->status == 0) state->pwm_out = 0;
+
+	if(state->status){
+		printk("desired_pos = %d   pos = %d   ....  err:%d   P:%d   I:%d   D:%d   PID:%d   pwm_out = %d\n",  state->desired_position, state->position,  pos_err, Pterm, Iterm, Dterm, PIDterm, state->pwm_out);
+	}
+
+
+	// TODO:
+	//if(PIDterm > MC_PWM_PERIOD) return MC_PWM_PERIOD;
+	//else if(PIDterm < -MC_PWM_PERIOD) return -MC_PWM_PERIOD;
+	//else return PIDterm;
+}
 
 struct wq_wrapper
 {
 	struct work_struct worker;
 	struct sock *sk;
+	unsigned char internal;
 };
 
 struct StateResponse
@@ -50,6 +254,8 @@ struct StateResponse
 
 struct wq_wrapper wq_data;
 
+struct wq_wrapper wq_pid_data;
+
 // static DECLARE_COMPLETION( threadcomplete );
 struct workqueue_struct *wq;
 
@@ -58,10 +264,12 @@ void cb_data(struct sock *sk, int bytes)
 	if(KOVAN_KMOD_DEBUG) printk("Message Received\n");
 
 	wq_data.sk = sk;
+	wq_data.internal = 0;
 	queue_work(wq, &wq_data.worker);
 }
 
-struct StateResponse state()
+
+struct StateResponse state(void)
 {
 	struct State ret;
 
@@ -72,6 +280,49 @@ struct StateResponse state()
 	response.state = ret;
 	//printk("State called\n");
 	return response;
+}
+
+
+
+
+void pid_timer_callback( unsigned long data )
+{
+
+
+
+ // printk( "pid_timer_callback called.\n");
+  mod_timer( &pid_timer, jiffies + msecs_to_jiffies(20) );
+
+  if (kovan_regs[PID_MODES] == 0) return;
+
+ // set up anything we need to set up in the pid packet
+ for (unsigned int i = 0; i < 4; i ++){
+
+	 pid_states[i].position = ((int)kovan_regs[BEMF_0_HIGH+i] << 16) | kovan_regs[BEMF_0_LOW+i];
+
+	 pid_states[i].desired_position = ((int)kovan_regs[GOAL_POS_0_HIGH] << 16) | kovan_regs[GOAL_POS_0_LOW+i];
+	 pid_states[i].desired_speed = ((int)kovan_regs[GOAL_SPEED_0_HIGH] << 16) | kovan_regs[GOAL_SPEED_0_LOW+i];
+
+	 pid_states[i].mode = (kovan_regs[PID_MODES] >> ((3-i)<<1)) & 0x3;
+
+	 if (kovan_regs[PID_PN_0+i] != 0) pid_states[i].Kp_n = kovan_regs[PID_PN_0 + i];
+	 if (kovan_regs[PID_PD_0+i] != 0) pid_states[i].Kp_d = kovan_regs[PID_PD_0 + i];
+	 if (kovan_regs[PID_IN_0+i] != 0) pid_states[i].Ki_n = kovan_regs[PID_IN_0 + i];
+	 if (kovan_regs[PID_ID_0+i] != 0) pid_states[i].Ki_d = kovan_regs[PID_ID_0 + i];
+	 if (kovan_regs[PID_DN_0+i] != 0) pid_states[i].Kv_n = kovan_regs[PID_DN_0 + i];
+	 if (kovan_regs[PID_DD_0+i] != 0) pid_states[i].Kv_d = kovan_regs[PID_DD_0 + i];
+
+ }
+
+
+
+	// add to the work queue
+    if(KOVAN_KMOD_DEBUG)printk("------adding pid job to the work queue\n");
+ 	wq_pid_data.sk = 0;
+	wq_pid_data.internal = 1;
+	queue_work(wq, &wq_pid_data.worker);
+	if(KOVAN_KMOD_DEBUG)printk("------pid job has been added to the work queue\n");
+
 }
 
 
@@ -104,15 +355,25 @@ struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 			break;
 		
 		case WriteCommandType:
+		{
+			struct WriteCommand *w_cmd = (struct WriteCommand*) &(cmd.data);
+
+			// handle registers that don't go to the fpga
+			if (w_cmd->addy > NUM_FPGA_REGS && w_cmd->addy < TOTAL_REGS){
+				kovan_regs[w_cmd->addy] = w_cmd->val;
+				printk("Writing Kovan Reg[%d] = %d\n",w_cmd->addy, w_cmd->val);
+				continue;
+			}
+
 			if (num_write_commands < WRITE_COMMAND_BUFF_SIZE){
-				struct WriteCommand *w_cmd = (struct WriteCommand*) &(cmd.data);
 				write_addresses[num_write_commands] = 	w_cmd->addy;
 				write_values[num_write_commands] = 	w_cmd->val;
 				if(KOVAN_KMOD_DEBUG) printk("r[%d]<=%d\n",w_cmd->addy, w_cmd->val);
 				if (write_addresses[num_write_commands] < NUM_FPGA_REGS){
 					num_write_commands += 1;
-				} // otherwise ignore this out of range request
+				}// otherwise ignore this out of range request
 			}// no more room for write commands
+		}
 			break;
 		
 		default: break;
@@ -127,6 +388,10 @@ struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 		response = state();
 	}
 
+	for (unsigned int i = 0; i < NUM_FPGA_REGS; i++){
+		kovan_regs[i] = response.state.t[i];
+	}
+
 	return response;
 }
 
@@ -134,8 +399,69 @@ struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 
 void do_work(struct work_struct *data)
 {
+	if(KOVAN_KMOD_DEBUG) printk("do work:\n");
+
 	struct wq_wrapper *foo = container_of(data, struct wq_wrapper, worker);
+
+
+	if(KOVAN_KMOD_DEBUG) printk("wq_wrapper foo = %p\n", foo);
 	
+	// TODO: this is so incredibly hacky
+	if (foo->internal){
+
+		if(KOVAN_KMOD_DEBUG) printk("do_work internal call\n");
+
+		unsigned char pwm_packet[sizeof(struct Packet)+5*sizeof(struct Command)];
+		struct Packet *janky_pwm_packet = (struct Packet*)&pwm_packet;
+
+		janky_pwm_packet->num = 6;
+
+		for (unsigned int i = 0; i < 4; i++) step_pid(&pid_states[i]);
+
+		// pwm
+		struct WriteCommand *cmd = 0;
+		for (unsigned int i = 0; i < 4; i++){
+			cmd = (struct WriteCommand *) janky_pwm_packet->commands[i].data;
+			if (pid_states[i].status){
+				cmd->val = pid_states[i].pwm_out;
+				cmd->addy = MOTOR_PWM_0 + i;
+			}else{
+				cmd->addy = 0;
+			}
+			janky_pwm_packet->commands[i].type = WriteCommandType;
+		}
+
+
+		// drive code
+		unsigned char drive_code =
+				((pid_states[0].drive_code & 0x3) << 6) |
+				((pid_states[1].drive_code & 0x3) << 4) |
+				((pid_states[2].drive_code & 0x3) << 2) |
+				((pid_states[3].drive_code & 0x3));
+
+		cmd = (struct WriteCommand *) janky_pwm_packet->commands[4].data;
+		cmd->val =  drive_code;
+		cmd->addy = MOTOR_DRIVE_CODE_T;
+		janky_pwm_packet->commands[4].type = WriteCommandType;
+
+		// state request
+		janky_pwm_packet->commands[5].type = StateCommandType;
+
+		do_packet(pwm_packet, sizeof(struct Packet));
+
+
+		// set done register
+		unsigned short pid_status =
+				((pid_states[0].status & 0x1) << 3) |
+				((pid_states[1].status & 0x1) << 2) |
+				((pid_states[2].status & 0x1) << 1) |
+				((pid_states[3].status & 0x1));
+
+		kovan_regs[PID_STATUS] = pid_status;
+
+		return;
+	}
+
 	int len = 0;
 	while((len = skb_queue_len(&foo->sk->sk_receive_queue)) > 0) {
 		struct sk_buff *skb = skb_dequeue(&foo->sk->sk_receive_queue);
@@ -206,15 +532,26 @@ static int __init server_init(void)
 
 	/* create work queue */
 	INIT_WORK(&wq_data.worker, do_work);
+	INIT_WORK(&wq_pid_data.worker, do_work);
 	wq = create_singlethread_workqueue("myworkqueue");
 	if(!wq) {
 		return -ENOMEM;
 	}
 
 	if(sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &clientsocket) < 0) {
-		printk(KERN_ERR "server: Error creating clientsocket.n\n");
+		printk(KERN_ERR "server: Error creating clientsocket.\n");
 		return -EIO;
 	}
+
+	printk("Initializing pid state structs\n");
+	for (int i = 0; i < 4; i++) init_pid_state(&pid_states[i]);
+
+	printk("Setting up pid timer\n");
+	setup_timer( &pid_timer, pid_timer_callback, 0 );
+
+	printk("Starting pid timer\n");
+	mod_timer( &pid_timer, jiffies + msecs_to_jiffies(200) );
+
 	return 0;
 }
 
@@ -224,8 +561,8 @@ static void __exit server_exit(void)
 	if(clientsocket) sock_release(clientsocket);
 
 	if(wq) {
-                flush_workqueue(wq);
-                destroy_workqueue(wq);
+		flush_workqueue(wq);
+		destroy_workqueue(wq);
 	}
 	
 	printk("Exiting Kovan Module\n");
