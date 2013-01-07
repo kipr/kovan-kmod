@@ -92,7 +92,7 @@ pid_state pid_states[4];
 
 void init_pid_state(pid_state *state){
 
-	state->Kp_n = 1;//90;
+	state->Kp_n = 2;//90;
 	state->Ki_n = 0;//0;
 	state->Kv_n = 1;//-30;
 	state->Kp_d = 10;//10;
@@ -170,12 +170,13 @@ void step_pid(pid_state *state){
 	case 3:
 		if ((pos_err > 0 && pos_err < GOAL_EPSILON)
 				|| (pos_err < 0 && pos_err > -GOAL_EPSILON)
-				|| (pos_err < 0 && state->desired_speed < 0)
-				|| (pos_err > 0 && state->desired_speed > 0)){
+				|| (pos_err < 0 && state->desired_speed > 0)
+				|| (pos_err > 0 && state->desired_speed < 0)){
 			// at the goal
 			state->pwm_out = 0;
 			state->status = 0;
 			state->drive_code = DRIVE_CODE_BRAKE;
+			state->mode = 0;
 			return;
 		}else{
 			err = speed_err;
