@@ -55,6 +55,9 @@ static unsigned short kovan_regs[TOTAL_REGS];
 #define DRIVE_CODE_REVERSE 0x1
 #define DRIVE_CODE_IDLE 0x0
 
+
+
+
 typedef struct {
 	int desired_position;
 	int desired_speed;
@@ -63,7 +66,7 @@ typedef struct {
 	int position_prev;
 
 	int speed_prev;
-
+	int err_prev;
 	int err_integr;
 
 	char mode;
@@ -82,18 +85,19 @@ typedef struct {
 
 	unsigned short pwm_out;
 	char drive_code;
+	int pid_term_prev;
 } pid_state;
 
 pid_state pid_states[4];
 
 void init_pid_state(pid_state *state){
 
-	state->Kp_n = 10;//90;
+	state->Kp_n = 1;//90;
 	state->Ki_n = 0;//0;
-	state->Kv_n = -2;//-30;
-	state->Kp_d = 1;//10;
-	state->Ki_d = 5;//10;
-	state->Kv_d = 1;//10;
+	state->Kv_n = 1;//-30;
+	state->Kp_d = 10;//10;
+	state->Ki_d = 10;//10;
+	state->Kv_d = 15;//10;
 
 	state->mode = 0;
 	state->status = 0;
@@ -106,11 +110,13 @@ void init_pid_state(pid_state *state){
 
 	state->speed_prev = 0;
 	state->err_integr = 0;
+	state->err_prev = 0;
 
-	state->alpha = 50;
+	state->alpha = 20;
 
 	state->pwm_out = 0;
 	state->drive_code = 0;
+	state->pid_term_prev = 0;
 }
 
 void step_pid(pid_state *state){
@@ -118,7 +124,7 @@ void step_pid(pid_state *state){
 	//  printk("step_pid:\n");
 	static const int GOAL_EPSILON = 20;
 
-	static const short RESISTANCE = 400;
+	static const short RESISTANCE = 0;//400;
 	static const short MAX_PWM = 2600 - RESISTANCE;
 
 	static const int MAX_I_ERROR = 1000;
@@ -129,8 +135,12 @@ void step_pid(pid_state *state){
 
 
 	int pos_err = state->desired_position - state->position;
-	int speed_err = state->desired_speed - state->speed_prev; // TODO
 
+	int filtered_speed = state->alpha*25*(state->position - state->position_prev) +  (100-state->alpha)*state->speed_prev;
+	filtered_speed = filtered_speed / 100;
+
+
+	int speed_err = state->desired_speed - filtered_speed;
 
 	int err = 0;
 	//if (state->mode != 0) state->mode = 0x1; // TODO: remove!
@@ -158,7 +168,10 @@ void step_pid(pid_state *state){
 		err = speed_err;
 		break;
 	case 3:
-		if ((pos_err > 0 && pos_err < GOAL_EPSILON) || (pos_err < 0 && pos_err > -GOAL_EPSILON)){
+		if ((pos_err > 0 && pos_err < GOAL_EPSILON)
+				|| (pos_err < 0 && pos_err > -GOAL_EPSILON)
+				|| (pos_err < 0 && state->desired_speed < 0)
+				|| (pos_err > 0 && state->desired_speed > 0)){
 			// at the goal
 			state->pwm_out = 0;
 			state->status = 0;
@@ -179,23 +192,25 @@ void step_pid(pid_state *state){
 
 	// Integral Term
 	////////////////////////////////////////////////////////////////////////////////
-	state->err_integr += err;
+	//FIXME: state->err_integr += err;
 	// is the error within the maximum or minimum motor power range?
-	if(state->err_integr > MAX_I_ERROR) state->err_integr = MAX_I_ERROR;
-	else if(state->err_integr < MIN_I_ERROR) state->err_integr = MIN_I_ERROR;
-
-	Iterm = (state->Ki_n * state->err_integr )/state->Ki_d;
+	//if(state->err_integr > MAX_I_ERROR) state->err_integr = MAX_I_ERROR;
+	//else if(state->err_integr < MIN_I_ERROR) state->err_integr = MIN_I_ERROR;
+	//TODO: Iterm = (state->Ki_n * state->err_integr )/state->Ki_d;
 
 	// Derivative Term
 	////////////////////////////////////////////////////////////////////////////////
-	int filtered_speed = state->alpha*(state->position - state->position_prev) +  (100-state->alpha)*state->speed_prev;
-	filtered_speed = filtered_speed / 100;
 
-	Dterm = (state->Kv_n * (filtered_speed))/state->Kv_d;
+	Dterm = (state->Kv_n * (err-state->err_prev))/state->Kv_d;
 	state->position_prev = state->position;
 	state->speed_prev = filtered_speed;
 
-	PIDterm = Pterm + Iterm + Dterm;
+	// TODO: this is a hack
+	PIDterm = Pterm + Iterm + Dterm + state->pid_term_prev;
+	state->pid_term_prev = PIDterm;
+
+
+	state->err_prev = err;
 
 	// TODO: convert PIDterm to 2600
 	if (PIDterm > 0){
@@ -220,18 +235,31 @@ void step_pid(pid_state *state){
 	}
 
 
+
+/*
 	static const int DEADBAND = 20;
 	if (state->pwm_out < DEADBAND){
 		state->pwm_out = 0;
 	}else{
 		state->pwm_out += RESISTANCE;
 	}
+*/
 	if (state->mode > 0 && state->status == 0) state->pwm_out = 0;
 
 	if(state->status){
-		printk("desired_pos = %d   pos = %d   ....  err:%d   P:%d   I:%d   D:%d   PID:%d   pwm_out = %d\n",  state->desired_position, state->position,  pos_err, Pterm, Iterm, Dterm, PIDterm, state->pwm_out);
+		printk("desired_pos = %d   pos = %d  vel:%d speed_err %d pos_err:%d  err:%d   P:%d   I:%d   D:%d   PID:%d   pwm_out = %d\n",
+				state->desired_position,
+				state->position,
+				filtered_speed,
+				speed_err,
+				pos_err,
+				err,
+				Pterm,
+				Iterm,
+				Dterm,
+				PIDterm,
+				state->pwm_out);
 	}
-
 
 	// TODO:
 	//if(PIDterm > MC_PWM_PERIOD) return MC_PWM_PERIOD;
@@ -283,45 +311,59 @@ struct StateResponse state(void)
 }
 
 
-
-
 void pid_timer_callback( unsigned long data )
 {
 
 
 
- // printk( "pid_timer_callback called.\n");
-  mod_timer( &pid_timer, jiffies + msecs_to_jiffies(20) );
+	// printk( "pid_timer_callback called.\n");
+	mod_timer( &pid_timer, jiffies + msecs_to_jiffies(40) );
 
-  if (kovan_regs[PID_MODES] == 0) return;
 
- // set up anything we need to set up in the pid packet
- for (unsigned int i = 0; i < 4; i ++){
 
-	 pid_states[i].position = ((int)kovan_regs[BEMF_0_HIGH+i] << 16) | kovan_regs[BEMF_0_LOW+i];
+	// set up anything we need to set up in the pid packet
+	for (unsigned int i = 0; i < 4; i ++){
 
-	 pid_states[i].desired_position = ((int)kovan_regs[GOAL_POS_0_HIGH] << 16) | kovan_regs[GOAL_POS_0_LOW+i];
-	 pid_states[i].desired_speed = ((int)kovan_regs[GOAL_SPEED_0_HIGH] << 16) | kovan_regs[GOAL_SPEED_0_LOW+i];
+		pid_states[i].position = ((int)kovan_regs[BEMF_0_HIGH+i] << 16) | kovan_regs[BEMF_0_LOW+i];
 
-	 pid_states[i].mode = (kovan_regs[PID_MODES] >> ((3-i)<<1)) & 0x3;
+		pid_states[i].desired_position = ((int)kovan_regs[GOAL_POS_0_HIGH+i] << 16) | kovan_regs[GOAL_POS_0_LOW+i];
+		pid_states[i].desired_speed = ((int)kovan_regs[GOAL_SPEED_0_HIGH+i] << 16) | kovan_regs[GOAL_SPEED_0_LOW+i];
 
-	 if (kovan_regs[PID_PN_0+i] != 0) pid_states[i].Kp_n = kovan_regs[PID_PN_0 + i];
-	 if (kovan_regs[PID_PD_0+i] != 0) pid_states[i].Kp_d = kovan_regs[PID_PD_0 + i];
-	 if (kovan_regs[PID_IN_0+i] != 0) pid_states[i].Ki_n = kovan_regs[PID_IN_0 + i];
-	 if (kovan_regs[PID_ID_0+i] != 0) pid_states[i].Ki_d = kovan_regs[PID_ID_0 + i];
-	 if (kovan_regs[PID_DN_0+i] != 0) pid_states[i].Kv_n = kovan_regs[PID_DN_0 + i];
-	 if (kovan_regs[PID_DD_0+i] != 0) pid_states[i].Kv_d = kovan_regs[PID_DD_0 + i];
+		pid_states[i].mode = (kovan_regs[PID_MODES] >> ((3-i)<<1)) & 0x3;
 
- }
+		if (kovan_regs[PID_PN_0+i] != 0) pid_states[i].Kp_n = kovan_regs[PID_PN_0 + i];
+		if (kovan_regs[PID_PD_0+i] != 0) pid_states[i].Kp_d = kovan_regs[PID_PD_0 + i];
+		if (kovan_regs[PID_IN_0+i] != 0) pid_states[i].Ki_n = kovan_regs[PID_IN_0 + i];
+		if (kovan_regs[PID_ID_0+i] != 0) pid_states[i].Ki_d = kovan_regs[PID_ID_0 + i];
+		if (kovan_regs[PID_DN_0+i] != 0) pid_states[i].Kv_n = kovan_regs[PID_DN_0 + i];
+		if (kovan_regs[PID_DD_0+i] != 0) pid_states[i].Kv_d = kovan_regs[PID_DD_0 + i];
+	}
+
+
+	 printk("Pos: [%d, %d, %d, %d]  Goal: [%d, %d, %d, %d]  Speed: [%d, %d, %d, %d]\n",
+			 pid_states[0].position,
+			 pid_states[1].position,
+			 pid_states[2].position,
+			 pid_states[3].position,
+			 pid_states[0].desired_position,
+			 pid_states[1].desired_position,
+			 pid_states[2].desired_position,
+			 pid_states[3].desired_position,
+			 pid_states[0].desired_speed,
+			 pid_states[1].desired_speed,
+			 pid_states[2].desired_speed,
+			 pid_states[3].desired_speed);
+
+
+
+	if (kovan_regs[PID_MODES] == 0) return;
 
 
 
 	// add to the work queue
-    if(KOVAN_KMOD_DEBUG)printk("------adding pid job to the work queue\n");
  	wq_pid_data.sk = 0;
 	wq_pid_data.internal = 1;
 	queue_work(wq, &wq_pid_data.worker);
-	if(KOVAN_KMOD_DEBUG)printk("------pid job has been added to the work queue\n");
 
 }
 
@@ -357,6 +399,7 @@ struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 		case WriteCommandType:
 		{
 			struct WriteCommand *w_cmd = (struct WriteCommand*) &(cmd.data);
+
 
 			// handle registers that don't go to the fpga
 			if (w_cmd->addy > NUM_FPGA_REGS && w_cmd->addy < TOTAL_REGS){
