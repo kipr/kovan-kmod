@@ -248,7 +248,7 @@ void step_pid(pid_state *state){
 	if (state->mode > 0 && state->status == 0) state->pwm_out = 0;
 
 	if(state->status){
-		printk("desired_pos = %d   pos = %d  vel:%d speed_err %d pos_err:%d  err:%d   P:%d   I:%d   D:%d   PID:%d   pwm_out = %d\n",
+	/*	printk("desired_pos = %d   pos = %d  vel:%d speed_err %d pos_err:%d  err:%d   P:%d   I:%d   D:%d   PID:%d   pwm_out = %d\n",
 				state->desired_position,
 				state->position,
 				filtered_speed,
@@ -259,7 +259,7 @@ void step_pid(pid_state *state){
 				Iterm,
 				Dterm,
 				PIDterm,
-				state->pwm_out);
+				state->pwm_out); */
 	}
 
 	// TODO:
@@ -341,7 +341,7 @@ void pid_timer_callback( unsigned long data )
 	}
 
 
-	 printk("Pos: [%d, %d, %d, %d]  Goal: [%d, %d, %d, %d]  Speed: [%d, %d, %d, %d]\n",
+	/*  printk("Pos: [%d, %d, %d, %d]  Goal: [%d, %d, %d, %d]  Speed: [%d, %d, %d, %d]\n",
 			 pid_states[0].position,
 			 pid_states[1].position,
 			 pid_states[2].position,
@@ -353,7 +353,7 @@ void pid_timer_callback( unsigned long data )
 			 pid_states[0].desired_speed,
 			 pid_states[1].desired_speed,
 			 pid_states[2].desired_speed,
-			 pid_states[3].desired_speed);
+			 pid_states[3].desired_speed); */
 
 
 
@@ -381,7 +381,7 @@ struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 	memset(&response, 0, sizeof(struct StateResponse));
 	
 	if(size < sizeof(struct Packet)) {
-		if(KOVAN_KMOD_WARN)printk("Packet was too small!! Not processing.\n");
+		if(KOVAN_KMOD_WARN) printk("Packet was too small!! Not processing.\n");
 		return response; // Error: Packet is too small?
 	}
 	
