@@ -593,8 +593,9 @@ static int __init server_init(void)
 	printk("Setting up pid timer\n");
 	setup_timer( &pid_timer, pid_timer_callback, 0 );
 
-	printk("Starting pid timer\n");
-	mod_timer( &pid_timer, jiffies + msecs_to_jiffies(200) );
+	// Not working well. Disabled.
+	// printk("Starting pid timer\n");
+	// mod_timer( &pid_timer, jiffies + msecs_to_jiffies(200) );
 
 	return 0;
 }
