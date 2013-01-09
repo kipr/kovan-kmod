@@ -8,7 +8,7 @@ extern "C" {
 
 #define MAX_COMMAND_DATA_SIZE 16
 #define NUM_FPGA_REGS 48
-#define TOTAL_REGS 128
+#define TOTAL_REGS 200
 
 enum CommandType
 {
