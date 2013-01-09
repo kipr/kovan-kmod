@@ -29,8 +29,6 @@ struct Packet
 	struct Command commands[1];
 };
 
-
-
 struct WriteCommand
 {
 	unsigned short addy; // 0 - 40
