@@ -574,6 +574,8 @@ static int __init server_init(void)
 		init_pid_state(&pid_states[i]);
 	}
 
+	printk("PID should be disabled.\n");
+
 	// printk("Setting up pid timer\n");
 	// setup_timer(&pid_timer, pid_timer_callback, 0);
 
