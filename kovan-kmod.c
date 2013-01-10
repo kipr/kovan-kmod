@@ -570,10 +570,12 @@ static int __init server_init(void)
 	memset(kovan_regs, 0, TOTAL_REGS);
 
 	printk("Initializing pid state structs\n");
-	for (int i = 0; i < 4; i++) init_pid_state(&pid_states[i]);
+	for (int i = 0; i < 4; ++i) {
+		init_pid_state(&pid_states[i]);
+	}
 
-	printk("Setting up pid timer\n");
-	setup_timer( &pid_timer, pid_timer_callback, 0);
+	// printk("Setting up pid timer\n");
+	// setup_timer(&pid_timer, pid_timer_callback, 0);
 
 	// Not working well. Disabled.
 	// printk("Starting pid timer\n");
