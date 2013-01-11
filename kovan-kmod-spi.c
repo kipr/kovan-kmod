@@ -24,7 +24,7 @@
 #include <asm/uaccess.h>	/* copy_*_user */
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <mach/irqs.h>
+//#include <mach/irqs.h>
 
 #include <linux/platform_device.h>
 #include <linux/mutex.h>

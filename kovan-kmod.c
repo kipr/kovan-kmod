@@ -411,6 +411,10 @@ struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 
 	if (have_state_request) {
 		response = state();
+
+		for (unsigned int i = NUM_FPGA_REGS; i < TOTAL_REGS; i++){
+			response.state.t[i] = kovan_regs[i];
+		}
 	}
 
 	for (unsigned int i = 0; i < NUM_FPGA_REGS; i++){
@@ -567,7 +571,7 @@ static int __init server_init(void)
 		return -EIO;
 	}
 	
-	memset(kovan_regs, 0, TOTAL_REGS);
+	memset(kovan_regs, 0, TOTAL_REGS*sizeof(kovan_regs[0]));
 
 	printk("Initializing pid state structs\n");
 	for (int i = 0; i < 4; ++i) {
