@@ -87,12 +87,12 @@ pid_state pid_states[4];
 
 void init_pid_state(pid_state *state)
 {
-	state->Kp_n = 2;//90;
-	state->Ki_n = 0;//0;
-	state->Kv_n = 1;//-30;
+	state->Kp_n = 10;//5;
+	state->Ki_n = 5;//5;
+	state->Kv_n = 1;//10;
 	state->Kp_d = 10;//10;
 	state->Ki_d = 10;//10;
-	state->Kv_d = 15;//10;
+	state->Kv_d = 10;//15;
 
 	state->mode = 0;
 	state->status = 0;
@@ -107,7 +107,7 @@ void init_pid_state(pid_state *state)
 	state->err_integr = 0;
 	state->err_prev = 0;
 
-	state->alpha = 20;
+	state->alpha = 75;
 
 	state->pwm_out = 0;
 	state->drive_code = 0;
@@ -122,7 +122,7 @@ void step_pid(pid_state *state)
 	static const short RESISTANCE = 0;//400;
 	static const short MAX_PWM = 2600 - RESISTANCE;
 
-	static const int MAX_I_ERROR = 1000;
+	static const int MAX_I_ERROR = 5500; // TODO: not ideal.... is based on Ki_d and Ki_n
 	static const int MIN_I_ERROR = -MAX_I_ERROR;
 
 
@@ -131,15 +131,14 @@ void step_pid(pid_state *state)
 
 	int pos_err = state->desired_position - state->position;
 
-	int filtered_speed = state->alpha * 25 * (state->position - state->position_prev)
-		+ (100 - state->alpha) * state->speed_prev;
-	filtered_speed = filtered_speed / 100;
+	int filtered_speed = 25 * (state->position - state->position_prev); ////state->alpha * 25 * (state->position - state->position_prev)
+	//	+ (100 - state->alpha) * state->speed_prev;
+	//filtered_speed = filtered_speed / 100;
 
 
 	int speed_err = state->desired_speed - filtered_speed;
 
 	int err = 0;
-	//if (state->mode != 0) state->mode = 0x1; // TODO: remove!
 
 	// Handle the different operating modes
 	switch(state->mode & 0x3) {
@@ -189,11 +188,11 @@ void step_pid(pid_state *state)
 
 	// Integral Term
 	////////////////////////////////////////////////////////////////////////////////
-	//FIXME: state->err_integr += err;
+	state->err_integr += err;
 	// is the error within the maximum or minimum motor power range?
-	//if(state->err_integr > MAX_I_ERROR) state->err_integr = MAX_I_ERROR;
-	//else if(state->err_integr < MIN_I_ERROR) state->err_integr = MIN_I_ERROR;
-	//TODO: Iterm = (state->Ki_n * state->err_integr )/state->Ki_d;
+	if(state->err_integr > MAX_I_ERROR) state->err_integr = MAX_I_ERROR;
+	else if(state->err_integr < MIN_I_ERROR) state->err_integr = MIN_I_ERROR;
+	Iterm = (state->Ki_n * state->err_integr )/state->Ki_d;
 
 	// Derivative Term
 	////////////////////////////////////////////////////////////////////////////////
@@ -203,16 +202,15 @@ void step_pid(pid_state *state)
 	state->speed_prev = filtered_speed;
 
 	// TODO: this is a hack
-	PIDterm = Pterm + Iterm + Dterm + state->pid_term_prev;
-	state->pid_term_prev = PIDterm;
+	PIDterm = Pterm + Iterm + Dterm;// + state->pid_term_prev;
 
 
-	state->err_prev = err;
 
 	// TODO: convert PIDterm to 2600
 	if (PIDterm > 0){
 
 		if (PIDterm > MAX_PWM) {
+			PIDterm = MAX_PWM;
 			state->pwm_out = MAX_PWM;
 		} else {
 			state->pwm_out = PIDterm;
@@ -223,6 +221,7 @@ void step_pid(pid_state *state)
 	}else{
 
 		if (PIDterm < -MAX_PWM) {
+			PIDterm = -MAX_PWM;
 			state->pwm_out = MAX_PWM;
 		} else {
 			state->pwm_out = -PIDterm;
@@ -231,35 +230,25 @@ void step_pid(pid_state *state)
 		state->drive_code = DRIVE_CODE_REVERSE;
 	}
 
-/*
-	static const int DEADBAND = 20;
-	if (state->pwm_out < DEADBAND){
-		state->pwm_out = 0;
-	}else{
-		state->pwm_out += RESISTANCE;
-	}
-*/
-	if (state->mode > 0 && state->status == 0) state->pwm_out = 0;
+	state->pid_term_prev = PIDterm;
 
+
+	state->err_prev = err;
+
+	if (state->mode > 0 && state->status == 0) state->pwm_out = 0;
+/*
 	if(state->status) {
-	/*	printk("desired_pos = %d   pos = %d  vel:%d speed_err %d pos_err:%d  err:%d   P:%d   I:%d   D:%d   PID:%d   pwm_out = %d\n",
-				state->desired_position,
-				state->position,
+
+		printk("%d,%d,%d,%d,%d,%d\n",
+				state->desired_speed,
 				filtered_speed,
-				speed_err,
-				pos_err,
-				err,
+				state->pwm_out,
 				Pterm,
 				Iterm,
-				Dterm,
-				PIDterm,
-				state->pwm_out); */
+				Dterm);
 	}
+*/
 
-	// TODO:
-	//if(PIDterm > MC_PWM_PERIOD) return MC_PWM_PERIOD;
-	//else if(PIDterm < -MC_PWM_PERIOD) return -MC_PWM_PERIOD;
-	//else return PIDterm;
 }
 
 struct wq_wrapper
@@ -314,7 +303,7 @@ void pid_timer_callback( unsigned long data )
 		pid_states[i].position = ((int)kovan_regs[BEMF_0_HIGH+i] << 16) | kovan_regs[BEMF_0_LOW + i];
 
 		pid_states[i].desired_position = ((int)kovan_regs[GOAL_POS_0_HIGH + i] << 16) | kovan_regs[GOAL_POS_0_LOW + i];
-		pid_states[i].desired_speed = ((int)kovan_regs[GOAL_SPEED_0_HIGH + i] << 16) | kovan_regs[GOAL_SPEED_0_LOW + i];
+		pid_states[i].desired_speed = (((int)kovan_regs[GOAL_SPEED_0_HIGH + i] << 16) | kovan_regs[GOAL_SPEED_0_LOW + i]);
 
 		pid_states[i].mode = (kovan_regs[PID_MODES] >> ((3 - i) << 1)) & 0x3;
 
@@ -578,14 +567,11 @@ static int __init server_init(void)
 		init_pid_state(&pid_states[i]);
 	}
 
-	printk("PID should be disabled.\n");
+	printk("Setting up pid timer\n");
+	setup_timer(&pid_timer, pid_timer_callback, 0);
 
-	// printk("Setting up pid timer\n");
-	// setup_timer(&pid_timer, pid_timer_callback, 0);
-
-	// Not working well. Disabled.
-	// printk("Starting pid timer\n");
-	// mod_timer( &pid_timer, jiffies + msecs_to_jiffies(200) );
+	 printk("Starting pid timer\n");
+	 mod_timer( &pid_timer, jiffies + msecs_to_jiffies(200) );
 
 	return 0;
 }
@@ -600,6 +586,8 @@ static void __exit server_exit(void)
 		destroy_workqueue(wq);
 	}
 	
+	del_timer(&pid_timer);
+
 	printk("Exiting Kovan Module\n");
 }
 
