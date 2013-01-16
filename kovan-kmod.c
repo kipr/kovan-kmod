@@ -152,6 +152,8 @@ void step_pid(pid_state *state)
 			state->status = 0;
 			state->drive_code = DRIVE_CODE_BRAKE;
 			state->desired_speed = 0;
+			state->err_prev = 0;
+			state->err_integr = 0;
 			return;
 		} else {
 			err = pos_err;
@@ -172,6 +174,8 @@ void step_pid(pid_state *state)
 			state->status = 0;
 			state->drive_code = DRIVE_CODE_BRAKE;
 			state->mode = 0;
+			state->err_prev = 0;
+			state->err_integr = 0;
 			return;
 		} else {
 			err = speed_err;
