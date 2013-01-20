@@ -564,12 +564,27 @@ static int __init server_init(void)
 		return -EIO;
 	}
 	
-	memset(kovan_regs, 0, TOTAL_REGS*sizeof(kovan_regs[0]));
-
 	printk("Initializing pid state structs\n");
 	for (int i = 0; i < 4; ++i) {
 		init_pid_state(&pid_states[i]);
 	}
+
+	memset(kovan_regs, 0, TOTAL_REGS*sizeof(kovan_regs[0]));
+
+	// set up pid coeff registers
+	for (unsigned int i = 0; i < 4; i++) {
+		kovan_regs[PID_PN_0 + i] = pid_states[i].Kp_n;
+		kovan_regs[PID_PD_0 + i] = pid_states[i].Kp_d;
+		kovan_regs[PID_IN_0 + i] = pid_states[i].Ki_n;
+		kovan_regs[PID_ID_0 + i] = pid_states[i].Ki_d;
+		kovan_regs[PID_DN_0 + i] = pid_states[i].Kv_n;
+		kovan_regs[PID_DD_0 + i] = pid_states[i].Kv_d;
+	}
+
+
+
+
+
 
 	printk("Setting up pid timer\n");
 	setup_timer(&pid_timer, pid_timer_callback, 0);
