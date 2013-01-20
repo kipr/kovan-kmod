@@ -87,12 +87,12 @@ pid_state pid_states[4];
 
 void init_pid_state(pid_state *state)
 {
-	state->Kp_n = 10;//5;
-	state->Ki_n = 5;//5;
-	state->Kv_n = 1;//10;
-	state->Kp_d = 10;//10;
-	state->Ki_d = 10;//10;
-	state->Kv_d = 10;//15;
+	state->Kp_n = 100;//5;
+	state->Ki_n = 50;//5;
+	state->Kv_n = 5;//10;
+	state->Kp_d = 100;//10;
+	state->Ki_d = 100;//10;
+	state->Kv_d = 100;//15;
 
 	state->mode = 0;
 	state->status = 0;
@@ -311,11 +311,11 @@ void pid_timer_callback( unsigned long data )
 
 		pid_states[i].mode = (kovan_regs[PID_MODES] >> ((3 - i) << 1)) & 0x3;
 
-		if (kovan_regs[PID_PN_0+i] != 0) pid_states[i].Kp_n = kovan_regs[PID_PN_0 + i];
+		pid_states[i].Kp_n = kovan_regs[PID_PN_0 + i];
 		if (kovan_regs[PID_PD_0+i] != 0) pid_states[i].Kp_d = kovan_regs[PID_PD_0 + i];
-		if (kovan_regs[PID_IN_0+i] != 0) pid_states[i].Ki_n = kovan_regs[PID_IN_0 + i];
+		pid_states[i].Ki_n = kovan_regs[PID_IN_0 + i];
 		if (kovan_regs[PID_ID_0+i] != 0) pid_states[i].Ki_d = kovan_regs[PID_ID_0 + i];
-		if (kovan_regs[PID_DN_0+i] != 0) pid_states[i].Kv_n = kovan_regs[PID_DN_0 + i];
+		pid_states[i].Kv_n = kovan_regs[PID_DN_0 + i];
 		if (kovan_regs[PID_DD_0+i] != 0) pid_states[i].Kv_d = kovan_regs[PID_DD_0 + i];
 	}
 
