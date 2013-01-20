@@ -379,7 +379,7 @@ struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 			// handle registers that don't go to the fpga
 			if (w_cmd->addy > NUM_FPGA_REGS && w_cmd->addy < TOTAL_REGS) {
 				kovan_regs[w_cmd->addy] = w_cmd->val;
-				printk("Writing Kovan Reg[%d] = %d\n", w_cmd->addy, w_cmd->val);
+				if(KOVAN_KMOD_DEBUG)printk("Writing Kovan Reg[%d] = %d\n", w_cmd->addy, w_cmd->val);
 				continue;
 			}
 
