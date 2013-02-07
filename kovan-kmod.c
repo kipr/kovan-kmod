@@ -26,6 +26,8 @@
 #include "kovan-regs.h"
 #include "protocol.h"
 
+#include "pwm_curve_5v.h"
+
 #define SERVER_PORT 5555
 
 #define WRITE_COMMAND_BUFF_SIZE NUM_RW_REGS
@@ -87,7 +89,7 @@ pid_state pid_states[4];
 
 void init_pid_state(pid_state *state)
 {
-	state->Kp_n = 100;//5;
+	state->Kp_n = 50;//5;
 	state->Ki_n = 50;//5;
 	state->Kv_n = 5;//10;
 	state->Kp_d = 100;//10;
@@ -385,7 +387,14 @@ struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 
 			if (num_write_commands < WRITE_COMMAND_BUFF_SIZE) {
 				write_addresses[num_write_commands] = 	w_cmd->addy;
-				write_values[num_write_commands] = 	w_cmd->val;
+				if (w_cmd->addy >= MOTOR_PWM_0 && w_cmd->addy <= MOTOR_PWM_3){
+					// correct PWM vals
+					// TODO: move to FPGA
+					const unsigned int percent = w_cmd->val / 26; // from 0 <--> 100
+					write_values[num_write_commands] = pwm_outs[percent];
+				}else{
+					write_values[num_write_commands] = 	w_cmd->val;
+				}
 				if(KOVAN_KMOD_DEBUG) printk("r[%d]<=%d\n", w_cmd->addy, w_cmd->val);
 				if (write_addresses[num_write_commands] < NUM_FPGA_REGS){
 					num_write_commands += 1;
