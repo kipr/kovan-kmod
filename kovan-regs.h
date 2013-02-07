@@ -103,5 +103,7 @@
 
 #define MOTOR_DRIVE_CODE_T 	39
 
+// Analog Voltage (3.3V or 5V, etc)
+#define VANA			146
 
 #endif /* KOVAN_REGS_H_ */
