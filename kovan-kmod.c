@@ -463,11 +463,15 @@ void do_work(struct work_struct *data)
 
 
 		// drive code
-		unsigned char drive_code =
-				((pid_states[0].drive_code & 0x3) << 6) |
-				((pid_states[1].drive_code & 0x3) << 4) |
-				((pid_states[2].drive_code & 0x3) << 2) |
-				((pid_states[3].drive_code & 0x3));
+		unsigned short drive_code = 0;
+
+		for (unsigned int i = 0; i < 4; i++){
+			if (pid_states[i].mode){
+				drive_code |= ((pid_states[i].drive_code & 0x3) << (6-(i<<1)));
+			}else{
+				drive_code |= (kovan_regs[MOTOR_DRIVE_CODE_T] & (0x3 << (6-(i<<1))));
+			}
+		}
 
 		cmd = (struct WriteCommand *) janky_pwm_packet->commands[4].data;
 		cmd->val =  drive_code;
