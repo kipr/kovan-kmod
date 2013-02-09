@@ -119,7 +119,7 @@ void init_pid_state(pid_state *state)
 void step_pid(pid_state *state)
 {
 	//  printk("step_pid:\n");
-	static const int GOAL_EPSILON = 20;
+	static const int GOAL_EPSILON = 10;
 
 	static const short RESISTANCE = 0;//400;
 	static const short MAX_PWM = 2600 - RESISTANCE;
@@ -175,9 +175,10 @@ void step_pid(pid_state *state)
 			state->pwm_out = 0;
 			state->status = 0;
 			state->drive_code = DRIVE_CODE_BRAKE;
-			state->mode = 0;
+			//state->mode = 0;
 			state->err_prev = 0;
 			state->err_integr = 0;
+			//printk("hit mtp goal!\n");
 			return;
 		} else {
 			err = speed_err;
@@ -242,18 +243,6 @@ void step_pid(pid_state *state)
 	state->err_prev = err;
 
 	if (state->mode > 0 && state->status == 0) state->pwm_out = 0;
-/*
-	if(state->status) {
-
-		printk("%d,%d,%d,%d,%d,%d\n",
-				state->desired_speed,
-				filtered_speed,
-				state->pwm_out,
-				Pterm,
-				Iterm,
-				Dterm);
-	}
-*/
 
 }
 
@@ -321,20 +310,6 @@ void pid_timer_callback( unsigned long data )
 		if (kovan_regs[PID_DD_0+i] != 0) pid_states[i].Kv_d = kovan_regs[PID_DD_0 + i];
 	}
 
-
-	/*  printk("Pos: [%d, %d, %d, %d]  Goal: [%d, %d, %d, %d]  Speed: [%d, %d, %d, %d]\n",
-			 pid_states[0].position,
-			 pid_states[1].position,
-			 pid_states[2].position,
-			 pid_states[3].position,
-			 pid_states[0].desired_position,
-			 pid_states[1].desired_position,
-			 pid_states[2].desired_position,
-			 pid_states[3].desired_position,
-			 pid_states[0].desired_speed,
-			 pid_states[1].desired_speed,
-			 pid_states[2].desired_speed,
-			 pid_states[3].desired_speed); */
 
 	if (kovan_regs[PID_MODES] == 0) return;
 
