@@ -1,4 +1,4 @@
-pwm_outs[101] = {
+unsigned short pwm_outs[101] = {
 	0,
 	26,
 	52,
