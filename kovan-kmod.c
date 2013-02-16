@@ -311,7 +311,10 @@ void pid_timer_callback( unsigned long data )
 	}
 
 
-	if (kovan_regs[PID_MODES] == 0) return;
+	if (kovan_regs[PID_MODES] == 0){
+		kovan_regs[PID_STATUS] = 0;
+		return;
+	}
 
 	// add to the work queue
  	wq_pid_data.sk = 0;
