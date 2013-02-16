@@ -89,8 +89,8 @@ pid_state pid_states[4];
 
 void init_pid_state(pid_state *state)
 {
-	state->Kp_n = 50;//5;
-	state->Ki_n = 50;//5;
+	state->Kp_n = 40;//5;
+	state->Ki_n = 40;//5;
 	state->Kv_n = 5;//10;
 	state->Kp_d = 100;//10;
 	state->Ki_d = 100;//10;
