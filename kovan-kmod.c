@@ -302,6 +302,8 @@ void pid_timer_callback( unsigned long data )
 
 		pid_states[i].mode = (kovan_regs[PID_MODES] >> ((3 - i) << 1)) & 0x3;
 
+		//if (pid_states[i].mode) printk("Motor %d mode = %d  pos_d = %d  speed_d = %d\n", i, pid_states[i].mode, pid_states[i].desired_position, pid_states[i].desired_speed);
+
 		pid_states[i].Kp_n = kovan_regs[PID_PN_0 + i];
 		if (kovan_regs[PID_PD_0+i] != 0) pid_states[i].Kp_d = kovan_regs[PID_PD_0 + i];
 		pid_states[i].Ki_n = kovan_regs[PID_IN_0 + i];
@@ -357,7 +359,7 @@ struct StateResponse do_packet(unsigned char *data, const unsigned int size)
 			struct WriteCommand *w_cmd = (struct WriteCommand *)&(cmd.data);
 
 			// handle registers that don't go to the fpga
-			if (w_cmd->addy > NUM_FPGA_REGS && w_cmd->addy < TOTAL_REGS) {
+			if ((w_cmd->addy+1) > NUM_FPGA_REGS && w_cmd->addy < TOTAL_REGS) {
 				kovan_regs[w_cmd->addy] = w_cmd->val;
 				if(KOVAN_KMOD_DEBUG)printk("Writing Kovan Reg[%d] = %d\n", w_cmd->addy, w_cmd->val);
 				continue;
