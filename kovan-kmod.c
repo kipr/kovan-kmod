@@ -28,7 +28,7 @@
 
 #include "pwm_curve_5v.h"
 
-#define SERVER_PORT 5555
+#define SERVER_PORT 4628
 
 #define WRITE_COMMAND_BUFF_SIZE NUM_RW_REGS
 
