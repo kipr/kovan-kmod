@@ -208,8 +208,7 @@ void step_pid(pid_state *state)
 	state->position_prev = state->position;
 	state->speed_prev = filtered_speed;
 
-	// TODO: this is a hack
-	PIDterm = Pterm + Iterm + Dterm;// + state->pid_term_prev;
+	PIDterm = Pterm + Iterm + Dterm + state->pid_term_prev;
 
 
 
