@@ -21,7 +21,6 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/timer.h>
-#include <linux/ktime.h>
 
 #include "kovan-kmod-spi.h"
 #include "kovan-regs.h"
@@ -84,8 +83,6 @@ typedef struct
 	unsigned short pwm_out;
 	char drive_code;
 	int pid_term_prev;
-  
-  ktime_t last;
 } pid_state;
 
 pid_state pid_states[4];
@@ -93,8 +90,8 @@ pid_state pid_states[4];
 void init_pid_state(pid_state *state)
 {
 	state->Kp_n = 40;//5;
-	state->Ki_n = 5; //5;
-	state->Kv_n = 20; //10;
+	state->Ki_n = 40;//5;
+	state->Kv_n = 5;//10;
 	state->Kp_d = 100;//10;
 	state->Ki_d = 100;//10;
 	state->Kv_d = 100;//15;
@@ -117,8 +114,6 @@ void init_pid_state(pid_state *state)
 	state->pwm_out = 0;
 	state->drive_code = 0;
 	state->pid_term_prev = 0;
-  
-  state->last = ktime_get();
 }
 
 void step_pid(pid_state *state)
@@ -138,8 +133,10 @@ void step_pid(pid_state *state)
 
 	int pos_err = state->desired_position - state->position;
 
-	int filtered_speed = ktime_sub(ktime_get(), state->last).tv64 / 10000L * (state->position - state->position_prev);
-  state->last = ktime_get();
+	int filtered_speed = 25 * (state->position - state->position_prev); ////state->alpha * 25 * (state->position - state->position_prev)
+	//	+ (100 - state->alpha) * state->speed_prev;
+	//filtered_speed = filtered_speed / 100;
+
 
 	int speed_err = state->desired_speed - filtered_speed;
 
@@ -211,7 +208,8 @@ void step_pid(pid_state *state)
 	state->position_prev = state->position;
 	state->speed_prev = filtered_speed;
 
-	PIDterm = Pterm + Iterm + Dterm + state->pid_term_prev;
+	// TODO: this is a hack
+	PIDterm = Pterm + Iterm + Dterm;// + state->pid_term_prev;
 
 
 
