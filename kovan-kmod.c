@@ -21,7 +21,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/timer.h>
-#include <linux/timekeeping.h>
+#include <linux/ktime.h>
 
 #include "kovan-kmod-spi.h"
 #include "kovan-regs.h"
